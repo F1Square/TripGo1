@@ -1,0 +1,3396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#667eea">
+    <title>TripGo - Trip Tracking App</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --vh: 1vh;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            min-height: calc(var(--vh, 1vh) * 100);
+            padding: 10px;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            min-height: calc(100vh - 20px);
+            min-height: calc(var(--vh, 1vh) * 100 - 20px);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #333;
+            padding: 0 10px;
+        }
+
+        .header h1 {
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            word-break: break-word;
+        }
+
+        .header p {
+            font-size: clamp(0.9rem, 3vw, 1rem);
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 14px 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #fff;
+            -webkit-appearance: none;
+            appearance: none;
+            min-height: 48px;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.2);
+            transform: translateY(-1px);
+        }
+
+        input[type="email"], input[type="password"], input[type="text"], input[type="number"] {
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+
+        .odometer-display {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px 15px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: clamp(1.2rem, 4vw, 1.5rem);
+            font-weight: bold;
+            word-break: break-word;
+        }
+
+        .trip-status {
+            background: #28a745;
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+        }
+
+        .trip-status.inactive {
+            background: #6c757d;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: clamp(1rem, 3vw, 1.1rem);
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .btn-primary:hover, .btn-primary:active {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+
+        .btn-danger:hover, .btn-danger:active {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(220, 53, 69, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .btn:active {
+            transform: translateY(0px);
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+            font-weight: bold;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+            word-break: break-word;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .trip-info {
+            background: #f8f9fa;
+            padding: 18px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+
+        .trip-info h3 {
+            margin-bottom: 12px;
+            color: #333;
+            font-size: clamp(1.1rem, 3vw, 1.2rem);
+        }
+
+        .trip-info p {
+            margin-bottom: 8px;
+            color: #666;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+            word-break: break-word;
+        }
+
+        .trip-info p strong {
+            color: #333;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .user-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .user-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-details p {
+            margin: 0;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+            word-break: break-word;
+        }
+
+        .user-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+
+        .btn-small {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            font-weight: bold;
+            cursor: pointer;
+            background: #667eea;
+            color: white;
+            transition: all 0.3s ease;
+            min-height: 40px;
+            white-space: nowrap;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-small:hover, .btn-small:active {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-small.btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-small.btn-danger:hover, .btn-small.btn-danger:active {
+            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
+        }
+
+        .tab-navigation {
+            display: flex;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 14px 10px;
+            border: none;
+            background: #f8f9fa;
+            color: #666;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            transform: scale(1.02);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: #e9ecef;
+        }
+
+        .tab-btn:active {
+            transform: scale(0.98);
+        }
+
+        .history-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .history-header h3 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .history-header p {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .export-section {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .export-section h4 {
+            margin-bottom: 8px;
+            color: #333;
+            font-size: clamp(1rem, 3vw, 1.1rem);
+        }
+
+        .export-section p {
+            color: #666;
+            font-size: clamp(0.85rem, 2vw, 0.9rem);
+            margin-bottom: 18px;
+        }
+
+        .export-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .date-range-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .export-form .form-group {
+            margin-bottom: 0;
+        }
+
+        .export-form .btn {
+            margin-bottom: 0;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .export-form .btn:hover, .export-form .btn:active {
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .trip-card {
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .trip-card:hover, .trip-card:active {
+            border-color: #667eea;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .trip-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+
+        .trip-card-title {
+            font-weight: bold;
+            color: #333;
+            font-size: clamp(1rem, 3vw, 1.1rem);
+            word-break: break-word;
+            flex: 1;
+        }
+
+        .trip-card-date {
+            color: #666;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .trip-card-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .trip-detail {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .trip-detail-label {
+            color: #666;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            font-weight: 500;
+        }
+
+        .trip-detail-value {
+            font-weight: bold;
+            color: #333;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+            word-break: break-word;
+        }
+
+        .trip-distance {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 12px;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+        }
+
+        .empty-history {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .empty-history h3 {
+            margin-bottom: 10px;
+            color: #999;
+            font-size: clamp(1.1rem, 3vw, 1.3rem);
+        }
+
+        .empty-history p {
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+        }
+
+        .delete-trip-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: clamp(0.8rem, 2vw, 0.85rem);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-height: 36px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .delete-trip-btn:hover, .delete-trip-btn:active {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+
+            .container {
+                padding: 15px;
+                margin: 5px auto;
+                min-height: calc(100vh - 10px);
+                border-radius: 15px;
+            }
+
+            .header {
+                margin-bottom: 20px;
+                padding: 0 5px;
+            }
+
+            .form-group {
+                margin-bottom: 16px;
+            }
+
+            .trip-card-details {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .trip-detail {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px 0;
+                border-bottom: 1px solid #f0f0f0;
+            }
+
+            .trip-detail:last-child {
+                border-bottom: none;
+            }
+
+            .user-header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: stretch;
+            }
+
+            .user-actions {
+                justify-content: stretch;
+            }
+
+            .btn-small {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .tab-navigation {
+                margin-bottom: 15px;
+            }
+
+            .trip-card {
+                padding: 15px;
+            }
+
+            .trip-card-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .trip-card-date {
+                align-self: flex-end;
+                white-space: normal;
+            }
+
+            .date-range-inputs {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .export-section {
+                padding: 15px;
+                margin-bottom: 20px;
+            }
+        }
+
+        /* Very small screens */
+        @media (max-width: 480px) {
+            .container {
+                padding: 12px;
+            }
+
+            .user-actions {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .btn-small {
+                width: 100%;
+            }
+
+            .trip-card {
+                padding: 12px;
+            }
+
+            .odometer-display {
+                padding: 15px 10px;
+            }
+        }
+
+        /* Large screens */
+        @media (min-width: 769px) {
+            .container {
+                max-width: 600px;
+                padding: 35px;
+            }
+
+            .trip-card-details {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .trip-detail {
+                flex-direction: column;
+            }
+        }
+
+        /* Landscape orientation on mobile */
+        @media screen and (orientation: landscape) and (max-height: 500px) {
+            .header {
+                margin-bottom: 15px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            .form-group {
+                margin-bottom: 14px;
+            }
+
+            .btn {
+                padding: 12px 20px;
+                min-height: 44px;
+            }
+        }
+
+        /* High DPI screens */
+        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
+            .container {
+                box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            }
+        }
+
+        /* Map Container Styles */
+        .map-container {
+            width: 100%;
+            height: 300px;
+            border-radius: 15px;
+            margin: 15px 0;
+            overflow: hidden;
+            border: 2px solid #e1e5e9;
+            position: relative;
+        }
+
+        .map-container.expanded {
+            height: 60vh;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            gap: 5px;
+        }
+
+        .map-control-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            font-size: 16px;
+        }
+
+        .map-control-btn:hover {
+            background: rgba(255, 255, 255, 1);
+        }
+
+        .real-time-info {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .real-time-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .gps-quality {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            font-size: 0.9em;
+        }
+
+        .trip-map-preview {
+            margin: 10px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e1e5e9;
+        }
+
+        .trip-map-preview .leaflet-container {
+            border-radius: 8px;
+        }
+
+        /* Full Map Modal Styles */
+        .full-map-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .full-map-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .full-map-content {
+            width: 95%;
+            height: 95%;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .full-map-header {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .full-map-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .full-map-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background 0.3s ease;
+        }
+
+        .full-map-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .full-map-body {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+
+        .full-map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        .full-map-sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 1px solid #e1e5e9;
+            flex-shrink: 0;
+        }
+
+        .full-map-controls {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .full-map-control-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            font-size: 16px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .full-map-control-btn:hover {
+            background: white;
+            transform: translateY(-1px);
+        }
+
+        .trip-stats-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            border: 1px solid #e1e5e9;
+        }
+
+        .trip-stats-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .trip-stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .trip-stat-label {
+            color: #666;
+        }
+
+        .trip-stat-value {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .route-info-section {
+            margin-bottom: 20px;
+        }
+
+        .route-points-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            background: white;
+        }
+
+        .route-point-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.85em;
+        }
+
+        .route-point-item:last-child {
+            border-bottom: none;
+        }
+
+        .route-point-time {
+            color: #666;
+            font-size: 0.8em;
+        }
+
+        /* Custom marker styles */
+        .start-marker-full, .end-marker-full {
+            background: white;
+            border: 3px solid #28a745;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 20px;
+            line-height: 29px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+        }
+
+        .start-marker-full {
+            border-color: #28a745;
+        }
+
+        .end-marker-full {
+            border-color: #dc3545;
+        }
+
+        .start-marker, .end-marker, .current-marker {
+            background: white;
+            border: 2px solid #007bff;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 16px;
+            line-height: 26px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .start-marker {
+            border-color: #28a745;
+        }
+
+        .end-marker {
+            border-color: #dc3545;
+        }
+
+        .current-marker {
+            border-color: #007bff;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Mobile responsiveness for full map modal */
+        @media (max-width: 768px) {
+            .full-map-content {
+                width: 100%;
+                height: 100%;
+                border-radius: 0;
+            }
+
+            .full-map-body {
+                flex-direction: column;
+            }
+
+            .full-map-sidebar {
+                width: 100%;
+                height: 250px;
+                border-left: none;
+                border-top: 1px solid #e1e5e9;
+                order: 2;
+            }
+
+            .full-map-container {
+                order: 1;
+                flex: 1;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 TripGo</h1>
+            <p>Your Smart Trip Tracking Companion</p>
+        </div>
+
+        <!-- Loading Screen -->
+        <div id="loadingScreen" class="loading">
+            <div class="spinner"></div>
+            <p>Loading your trip data...</p>
+        </div>
+
+        <!-- Authentication Forms -->
+        <div id="authForms" class="hidden">
+            <!-- Login Form -->
+            <div id="loginForm">
+                <h2>🔐 Sign In</h2>
+                <div class="form-group">
+                    <label for="loginEmail">Email Address:</label>
+                    <input type="email" id="loginEmail" placeholder="Enter your email address" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password:</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                </div>
+                <button class="btn btn-primary" id="loginBtn">Sign In</button>
+                <p style="text-align: center; margin-top: 15px;">
+                    Don't have an account? 
+                    <a href="#" id="showRegisterForm" style="color: #667eea; text-decoration: none; font-weight: bold;">Sign Up</a>
+                </p>
+            </div>
+
+            <!-- Register Form -->
+            <div id="registerForm" class="hidden">
+                <h2>📝 Sign Up</h2>
+                <div class="form-group">
+                    <label for="regEmail">Email Address:</label>
+                    <input type="email" id="regEmail" placeholder="Enter your email address" required>
+                </div>
+                <div class="form-group">
+                    <label for="regFullName">Full Name:</label>
+                    <input type="text" id="regFullName" placeholder="Enter your full name" required>
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">Password:</label>
+                    <input type="password" id="regPassword" placeholder="Enter password (min 6 characters)" required>
+                </div>
+                <div class="form-group">
+                    <label for="regConfirmPassword">Confirm Password:</label>
+                    <input type="password" id="regConfirmPassword" placeholder="Confirm your password" required>
+                </div>
+                <button class="btn btn-primary" id="registerBtn">Sign Up</button>
+                <p style="text-align: center; margin-top: 15px;">
+                    Already have an account? 
+                    <a href="#" id="showLoginForm" style="color: #667eea; text-decoration: none; font-weight: bold;">Sign In</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Main App Content -->
+        <div id="appContent" class="hidden">
+            <!-- User Info & Navigation -->
+            <div class="user-info">
+                <div class="user-header">
+                    <div class="user-details">
+                        <p><strong>Welcome, <span id="userFullName"></span>!</strong></p>
+                        <p style="font-size: 0.9em; color: #666;"><span id="userEmail"></span></p>
+                    </div>
+                    <div class="user-actions">
+                        <button class="btn-small btn-danger" id="logoutBtn">🚪 Logout</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Odometer Display -->
+            <div class="odometer-display" id="odometerDisplay">
+                Current Odometer: 0 km
+            </div>
+
+            <!-- Trip Status -->
+            <div id="tripStatus" class="trip-status inactive">
+                No Active Trip
+            </div>
+
+            <!-- Messages -->
+            <div id="messageContainer"></div>
+
+            <!-- Navigation Tabs -->
+            <div class="tab-navigation">
+                <button class="tab-btn active" id="newTripTab">🚗 New Trip</button>
+                <button class="tab-btn" id="historyTab">📊 Trip History</button>
+            </div>
+
+            <!-- New Trip Form -->
+            <div id="newTripContent">
+                <!-- Setup Form (First Time or No Active Trip) -->
+                <div id="setupForm">
+                    <div class="form-group">
+                        <label for="currentOdometer">Enter Current Odometer Reading (km):</label>
+                        <input type="number" id="currentOdometer" step="0.01" placeholder="e.g., 15000" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tripDate">Select Trip Date:</label>
+                        <input type="date" id="tripDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tripPurpose">Purpose of Trip:</label>
+                        <input type="text" id="tripPurpose" placeholder="Enter purpose of trip (e.g., Business meeting, Medical appointment)" required>
+                    </div>
+
+                    <button class="btn btn-primary" id="startTripBtn">
+                        🚀 Start Trip
+                    </button>
+                </div>
+            </div>
+
+            <!-- Trip History Content -->
+            <div id="historyContent" class="hidden">
+                <div class="history-header">
+                    <h3>📊 Your Trip History</h3>
+                    <p>All your completed trips</p>
+                </div>
+
+                <!-- Export Section -->
+                <div class="export-section">
+                    <h4>📥 Export Trip Data</h4>
+                    <p>Export your trips to CSV for a specific date range</p>
+                    
+                    <div class="export-form">
+                        <div class="date-range-inputs">
+                            <div class="form-group">
+                                <label for="exportStartDate">From Date:</label>
+                                <input type="date" id="exportStartDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="exportEndDate">To Date:</label>
+                                <input type="date" id="exportEndDate" required>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="exportCsvBtn">
+                            📊 Export to CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div id="tripHistoryList">
+                    <!-- Trip history will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Active Trip Display -->
+            <div id="activeTripDisplay" class="hidden">
+                <div class="trip-info">
+                    <h3>🚗 Trip in Progress</h3>
+                    <p><strong>Purpose:</strong> <span id="activePurpose"></span></p>
+                    <p><strong>Start Date:</strong> <span id="activeDate"></span></p>
+                    <p><strong>Start Odometer:</strong> <span id="activeStartOdometer"></span> km</p>
+                    <p><strong>Start Time:</strong> <span id="activeStartTime"></span></p>
+                </div>
+
+                <!-- Real-time Trip Information -->
+                <div class="real-time-info" id="realTimeInfo">
+                    <div class="real-time-stats">
+                        <div class="stat-item">
+                            <div class="stat-value" id="currentDistance">0.0 km</div>
+                            <div>Distance Traveled</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="currentDuration">0m</div>
+                            <div>Trip Duration</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="avgSpeed">0 km/h</div>
+                            <div>Average Speed</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="gps-quality">
+                                <span id="gpsQualityIcon">📡</span>
+                                <span id="gpsQualityText">Acquiring...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Map -->
+                <div class="map-container" id="tripMap">
+                    <div class="map-controls">
+                        <button class="map-control-btn" id="expandMapBtn" title="Expand Map">🔍</button>
+                        <button class="map-control-btn" id="centerMapBtn" title="Center on Location">📍</button>
+                        <button class="map-control-btn" id="toggleLayerBtn" title="Toggle Map Layer">🗺️</button>
+                    </div>
+                </div>
+
+                <button class="btn btn-danger" id="endTripBtn">
+                    🏁 End Trip
+                </button>
+            </div>
+
+            <!-- Location Status -->
+            <div id="locationStatus" class="message hidden">
+                📍 Getting your location...
+            </div>
+        </div>
+    </div>
+
+    <!-- Full Map Modal -->
+    <div id="fullMapModal" class="full-map-modal">
+        <div class="full-map-content">
+            <div class="full-map-header">
+                <h3 class="full-map-title" id="fullMapTitle">Trip Route Map</h3>
+                <button class="full-map-close" id="closeFullMap">✕ Close</button>
+            </div>
+            <div class="full-map-body">
+                <div class="full-map-container">
+                    <div id="fullMapContainer" style="width: 100%; height: 100%;"></div>
+                    <div class="full-map-controls">
+                        <button class="full-map-control-btn" id="fullMapFit" title="Fit Route">📏</button>
+                        <button class="full-map-control-btn" id="fullMapCenter" title="Center Map">📍</button>
+                        <button class="full-map-control-btn" id="fullMapLayer" title="Toggle Layer">🗺️</button>
+                        <button class="full-map-control-btn" id="fullMapZoomIn" title="Zoom In">➕</button>
+                        <button class="full-map-control-btn" id="fullMapZoomOut" title="Zoom Out">➖</button>
+                    </div>
+                </div>
+                <div class="full-map-sidebar" id="fullMapSidebar">
+                    <div class="trip-stats-section">
+                        <div class="trip-stats-title">📊 Trip Statistics</div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Purpose:</span>
+                            <span class="trip-stat-value" id="statPurpose">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Date:</span>
+                            <span class="trip-stat-value" id="statDate">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Distance:</span>
+                            <span class="trip-stat-value" id="statDistance">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Duration:</span>
+                            <span class="trip-stat-value" id="statDuration">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Avg Speed:</span>
+                            <span class="trip-stat-value" id="statAvgSpeed">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Start Area:</span>
+                            <span class="trip-stat-value" id="statStartArea">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">End Area:</span>
+                            <span class="trip-stat-value" id="statEndArea">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="route-info-section">
+                        <div class="trip-stats-title">🛣️ Route Information</div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Route Points:</span>
+                            <span class="trip-stat-value" id="statRoutePoints">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Start Time:</span>
+                            <span class="trip-stat-value" id="statStartTime">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">End Time:</span>
+                            <span class="trip-stat-value" id="statEndTime">-</span>
+                        </div>
+                    </div>
+
+                    <div class="route-info-section">
+                        <div class="trip-stats-title">� Speed Analysis</div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Max Speed:</span>
+                            <span class="trip-stat-value" id="statMaxSpeed">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">GPS Distance:</span>
+                            <span class="trip-stat-value" id="statGpsDistance">-</span>
+                        </div>
+                        <div class="trip-stat-item">
+                            <span class="trip-stat-label">Accuracy:</span>
+                            <span class="trip-stat-value" id="statAccuracy">-</span>
+                        </div>
+                    </div>
+
+                    <div class="route-info-section">
+                        <div class="trip-stats-title">�📍 Key Points</div>
+                        <div class="route-points-list" id="routePointsList">
+                            <!-- Route points will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TripGoApp {
+            constructor() {
+                this.currentLocation = null;
+                this.watchId = null;
+                this.token = localStorage.getItem('tripgo_token');
+                this.currentUser = null;
+                this.tripMap = null;
+                this.routePolyline = null;
+                this.currentMarker = null;
+                this.startMarker = null;
+                this.routePoints = [];
+                this.mapLayers = {
+                    street: null,
+                    satellite: null,
+                    currentLayer: 'street'
+                };
+                this.init();
+            }
+
+            // Custom rounding function based on business rule
+            roundDistance(value) {
+                if (typeof value !== 'number' || isNaN(value)) return 0;
+                
+                const decimal = value - Math.floor(value);
+                
+                // If decimal is 0.5 or less, round down
+                if (decimal <= 0.5) {
+                    return Math.floor(value);
+                } else {
+                    // If decimal is greater than 0.5, round up
+                    return Math.ceil(value);
+                }
+            }
+
+            async init() {
+                try {
+                    // Show loading screen initially
+                    document.getElementById('loadingScreen').classList.remove('hidden');
+                    document.getElementById('appContent').classList.add('hidden');
+                    document.getElementById('authForms').classList.add('hidden');
+
+                    // Simulate loading time
+                    await this.delay(1500);
+
+                    // Check if user is logged in
+                    if (this.token && await this.validateToken()) {
+                        await this.loadAppData();
+                        await this.loadTripHistory();
+                        this.showApp();
+                    } else {
+                        this.showAuth();
+                    }
+
+                    this.setupEventListeners();
+                    this.setTodayDate();
+                    this.setDateRestrictions();
+                    
+                } catch (error) {
+                    console.error('Error initializing app:', error);
+                    this.showMessage('Error loading app. Please refresh.', 'error');
+                    this.showAuth();
+                }
+            }
+
+            async validateToken() {
+                try {
+                    const response = await fetch('/api/user', {
+                        headers: { 'Authorization': `Bearer ${this.token}` }
+                    });
+                    
+                    if (response.ok) {
+                        this.currentUser = await response.json();
+                        return true;
+                    }
+                    
+                    // Token invalid, remove it
+                    localStorage.removeItem('tripgo_token');
+                    this.token = null;
+                    return false;
+                } catch (error) {
+                    return false;
+                }
+            }
+
+            showAuth() {
+                document.getElementById('loadingScreen').classList.add('hidden');
+                document.getElementById('appContent').classList.add('hidden');
+                document.getElementById('authForms').classList.remove('hidden');
+            }
+
+            showApp() {
+                document.getElementById('loadingScreen').classList.add('hidden');
+                document.getElementById('authForms').classList.add('hidden');
+                document.getElementById('appContent').classList.remove('hidden');
+                
+                // Update user info
+                if (this.currentUser) {
+                    document.getElementById('userFullName').textContent = this.currentUser.fullName;
+                    document.getElementById('userEmail').textContent = this.currentUser.email;
+                }
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            async loadAppData() {
+                try {
+                    const headers = { 'Authorization': `Bearer ${this.token}` };
+                    
+                    // Load current odometer
+                    const odometerResponse = await fetch('/api/odometer', { headers });
+                    const odometerData = await odometerResponse.json();
+                    
+                    // Load active trip
+                    const tripResponse = await fetch('/api/trip/active', { headers });
+                    const tripData = await tripResponse.json();
+
+                    this.updateOdometerDisplay(odometerData.currentOdometer);
+                    
+                    if (tripData.activeTrip) {
+                        this.displayActiveTrip(tripData.activeTrip);
+                        // Resume continuous GPS tracking for the active trip
+                        this.startLocationWatch();
+                        
+                        // If the trip has some existing GPS distance, initialize it
+                        if (tripData.activeTrip.gpsDistance) {
+                            this.totalGpsDistance = tripData.activeTrip.gpsDistance;
+                            this.updateLiveDistance();
+                        }
+                    } else {
+                        document.getElementById('currentOdometer').value = this.roundDistance(parseFloat(odometerData.currentOdometer));
+                    }
+
+                } catch (error) {
+                    console.error('Error loading app data:', error);
+                    this.showMessage('Error loading trip data', 'error');
+                }
+            }
+
+            async loadTripHistory() {
+                try {
+                    const headers = { 'Authorization': `Bearer ${this.token}` };
+                    const response = await fetch('/api/trips', { headers });
+                    const data = await response.json();
+                    
+                    this.displayTripHistory(data.trips || []);
+                } catch (error) {
+                    console.error('Error loading trip history:', error);
+                }
+            }
+
+            setupEventListeners() {
+                // Auth event listeners
+                document.getElementById('loginBtn').addEventListener('click', () => this.login());
+                document.getElementById('registerBtn').addEventListener('click', () => this.register());
+                document.getElementById('showRegisterForm').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.toggleAuthForms(true);
+                });
+                document.getElementById('showLoginForm').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.toggleAuthForms(false);
+                });
+                
+                // App event listeners
+                document.getElementById('startTripBtn').addEventListener('click', () => this.startTrip());
+                document.getElementById('endTripBtn').addEventListener('click', () => this.endTrip());
+                document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
+                document.getElementById('exportCsvBtn').addEventListener('click', () => this.exportToCSV());
+                
+                // Map control listeners
+                document.getElementById('expandMapBtn').addEventListener('click', () => this.toggleMapSize());
+                document.getElementById('centerMapBtn').addEventListener('click', () => this.centerMapOnLocation());
+                document.getElementById('toggleLayerBtn').addEventListener('click', () => this.toggleMapLayer());
+                
+                // Full map modal listeners
+                document.getElementById('closeFullMap').addEventListener('click', () => this.closeFullMapModal());
+                document.getElementById('fullMapFit').addEventListener('click', () => this.fitFullMapRoute());
+                document.getElementById('fullMapCenter').addEventListener('click', () => this.centerFullMap());
+                document.getElementById('fullMapLayer').addEventListener('click', () => this.toggleFullMapLayer());
+                document.getElementById('fullMapZoomIn').addEventListener('click', () => this.zoomFullMapIn());
+                document.getElementById('fullMapZoomOut').addEventListener('click', () => this.zoomFullMapOut());
+                
+                // Close modal when clicking outside
+                document.getElementById('fullMapModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'fullMapModal') {
+                        this.closeFullMapModal();
+                    }
+                });
+                
+                // Keyboard shortcuts for full map modal
+                document.addEventListener('keydown', (e) => {
+                    const modal = document.getElementById('fullMapModal');
+                    if (modal.classList.contains('active')) {
+                        switch(e.key) {
+                            case 'Escape':
+                                this.closeFullMapModal();
+                                break;
+                            case 'f':
+                            case 'F':
+                                if (e.ctrlKey || e.metaKey) {
+                                    e.preventDefault();
+                                    this.fitFullMapRoute();
+                                }
+                                break;
+                            case '+':
+                            case '=':
+                                e.preventDefault();
+                                this.zoomFullMapIn();
+                                break;
+                            case '-':
+                                e.preventDefault();
+                                this.zoomFullMapOut();
+                                break;
+                            case 'c':
+                            case 'C':
+                                e.preventDefault();
+                                this.centerFullMap();
+                                break;
+                            case 'l':
+                            case 'L':
+                                e.preventDefault();
+                                this.toggleFullMapLayer();
+                                break;
+                        }
+                    }
+                });
+                
+                // Tab navigation
+                document.getElementById('newTripTab').addEventListener('click', () => this.showTab('newTrip'));
+                document.getElementById('historyTab').addEventListener('click', () => this.showTab('history'));
+
+                // Form validation
+                document.getElementById('loginEmail').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.login();
+                });
+                document.getElementById('loginPassword').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.login();
+                });
+            }
+
+            toggleAuthForms(showRegister) {
+                if (showRegister) {
+                    document.getElementById('loginForm').classList.add('hidden');
+                    document.getElementById('registerForm').classList.remove('hidden');
+                } else {
+                    document.getElementById('registerForm').classList.add('hidden');
+                    document.getElementById('loginForm').classList.remove('hidden');
+                }
+            }
+
+            async login() {
+                try {
+                    const email = document.getElementById('loginEmail').value.trim();
+                    const password = document.getElementById('loginPassword').value;
+
+                    // Client-side validation
+                    if (!email) {
+                        this.showMessage('Please enter your email address', 'error');
+                        return;
+                    }
+
+                    if (!password) {
+                        this.showMessage('Please enter your password', 'error');
+                        return;
+                    }
+
+                    if (!this.isValidEmail(email)) {
+                        this.showMessage('Please enter a valid email address', 'error');
+                        return;
+                    }
+
+                    const response = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.token = data.token;
+                        this.currentUser = data.user;
+                        localStorage.setItem('tripgo_token', this.token);
+                        
+                        await this.loadAppData();
+                        await this.loadTripHistory();
+                        this.showApp();
+                        this.showMessage('Welcome back!', 'success');
+                        
+                        // Clear form
+                        document.getElementById('loginEmail').value = '';
+                        document.getElementById('loginPassword').value = '';
+                    } else {
+                        this.showMessage(data.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    this.showMessage('Login failed. Please check your internet connection and try again.', 'error');
+                }
+            }
+
+            async register() {
+                try {
+                    const email = document.getElementById('regEmail').value.trim();
+                    const fullName = document.getElementById('regFullName').value.trim();
+                    const password = document.getElementById('regPassword').value;
+                    const confirmPassword = document.getElementById('regConfirmPassword').value;
+
+                    // Client-side validation
+                    if (!email) {
+                        this.showMessage('Please enter your email address', 'error');
+                        return;
+                    }
+
+                    if (!this.isValidEmail(email)) {
+                        this.showMessage('Please enter a valid email address (e.g., user@example.com)', 'error');
+                        return;
+                    }
+
+                    if (!fullName) {
+                        this.showMessage('Please enter your full name', 'error');
+                        return;
+                    }
+
+                    if (fullName.length < 2) {
+                        this.showMessage('Full name must be at least 2 characters long', 'error');
+                        return;
+                    }
+
+                    if (!password) {
+                        this.showMessage('Please enter a password', 'error');
+                        return;
+                    }
+
+                    if (password.length < 6) {
+                        this.showMessage('Password must be at least 6 characters long', 'error');
+                        return;
+                    }
+
+                    if (password.length > 50) {
+                        this.showMessage('Password must be less than 50 characters long', 'error');
+                        return;
+                    }
+
+                    if (!confirmPassword) {
+                        this.showMessage('Please confirm your password', 'error');
+                        return;
+                    }
+
+                    if (password !== confirmPassword) {
+                        this.showMessage('Passwords do not match. Please check and try again.', 'error');
+                        return;
+                    }
+
+                    const response = await fetch('/api/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password, fullName })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        alert('Success: ' + data.message);
+                        this.toggleAuthForms(false);
+                        // Clear form
+                        document.getElementById('regEmail').value = '';
+                        document.getElementById('regFullName').value = '';
+                        document.getElementById('regPassword').value = '';
+                        document.getElementById('regConfirmPassword').value = '';
+                    } else {
+                        this.showMessage(data.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Registration error:', error);
+                    this.showMessage('Registration failed. Please check your internet connection and try again.', 'error');
+                }
+            }
+
+            async logout() {
+                try {
+                    await fetch('/api/logout', { method: 'POST' });
+                    localStorage.removeItem('tripgo_token');
+                    this.token = null;
+                    this.currentUser = null;
+                    this.stopLocationWatch();
+                    this.stopLiveDistanceUpdates();
+                    this.destroyTripMap();
+                    this.showAuth();
+                    this.showMessage('Logged out successfully', 'success');
+                } catch (error) {
+                    console.error('Logout error:', error);
+                }
+            }
+
+            showTab(tab) {
+                // Update tab buttons
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                
+                if (tab === 'newTrip') {
+                    document.getElementById('newTripTab').classList.add('active');
+                    document.getElementById('newTripContent').classList.remove('hidden');
+                    document.getElementById('historyContent').classList.add('hidden');
+                } else if (tab === 'history') {
+                    document.getElementById('historyTab').classList.add('active');
+                    document.getElementById('historyContent').classList.remove('hidden');
+                    document.getElementById('newTripContent').classList.add('hidden');
+                    // Refresh history when viewing
+                    this.loadTripHistory();
+                    // Set default export dates
+                    this.setDefaultExportDates();
+                    // Ensure date restrictions are applied
+                    this.setDateRestrictions();
+                }
+            }
+
+            setDefaultExportDates() {
+                const today = new Date().toISOString().split('T')[0];
+                const firstOfMonth = new Date();
+                firstOfMonth.setDate(1);
+                const firstOfMonthStr = firstOfMonth.toISOString().split('T')[0];
+                
+                document.getElementById('exportStartDate').value = firstOfMonthStr;
+                document.getElementById('exportEndDate').value = today;
+                
+                // Allow selecting any date for CSV export (no minimum date restriction)
+            }
+
+            async exportToCSV() {
+                try {
+                    const startDate = document.getElementById('exportStartDate').value;
+                    const endDate = document.getElementById('exportEndDate').value;
+
+                    // Client-side validation
+                    if (!startDate) {
+                        this.showMessage('Please select a start date', 'error');
+                        return;
+                    }
+
+                    if (!endDate) {
+                        this.showMessage('Please select an end date', 'error');
+                        return;
+                    }
+
+                    // Allow selecting any dates for export (past, present, or future)
+
+                    const start = new Date(startDate);
+                    const end = new Date(endDate);
+
+                    if (start > end) {
+                        this.showMessage('Start date must be before or equal to end date', 'error');
+                        return;
+                    }
+
+                    // Check if date range is too large (more than 1 year)
+                    const oneYear = 365 * 24 * 60 * 60 * 1000;
+                    if ((end - start) > oneYear) {
+                        this.showMessage('Please select a date range of 1 year or less', 'error');
+                        return;
+                    }
+
+                    const exportBtn = document.getElementById('exportCsvBtn');
+                    const originalText = exportBtn.textContent;
+                    exportBtn.textContent = '📊 Exporting...';
+                    exportBtn.disabled = true;
+
+                    const headers = { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    };
+
+                    const response = await fetch('/api/trips/export', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ startDate, endDate })
+                    });
+
+                    if (response.ok) {
+                        // Create download link
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        
+                        // Generate filename
+                        const startDateStr = startDate.replace(/-/g, '');
+                        const endDateStr = endDate.replace(/-/g, '');
+                        a.download = `Motor_Vehicle_Log_${startDateStr}_to_${endDateStr}.csv`;
+                        
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+
+                        this.showMessage(`CSV exported successfully for ${startDate} to ${endDate}`, 'success');
+                    } else {
+                        const errorData = await response.json();
+                        this.showMessage(errorData.error || 'Export failed', 'error');
+                    }
+
+                } catch (error) {
+                    console.error('Export error:', error);
+                    this.showMessage('Export failed. Please check your internet connection and try again.', 'error');
+                } finally {
+                    const exportBtn = document.getElementById('exportCsvBtn');
+                    exportBtn.textContent = '📊 Export to CSV';
+                    exportBtn.disabled = false;
+                }
+            }
+
+            setTodayDate() {
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('tripDate').value = today;
+                // Allow selecting any date for trips (no minimum date restriction)
+            }
+
+            setDateRestrictions() {
+                // Allow selecting any date for trips and exports (no minimum date restrictions)
+                // Users can now select past dates for both trip creation and CSV export
+            }
+
+            updateOdometerDisplay(odometer) {
+                const roundedOdometer = this.roundDistance(parseFloat(odometer));
+                document.getElementById('odometerDisplay').textContent = `Current Odometer: ${roundedOdometer} km`;
+            }
+
+            displayActiveTrip(trip) {
+                document.getElementById('setupForm').classList.add('hidden');
+                document.getElementById('activeTripDisplay').classList.remove('hidden');
+                document.getElementById('tripStatus').textContent = 'Trip in Progress';
+                document.getElementById('tripStatus').classList.remove('inactive');
+
+                document.getElementById('activePurpose').textContent = trip.purpose;
+                document.getElementById('activeDate').textContent = trip.startDate;
+                document.getElementById('activeStartOdometer').textContent = Math.round(parseFloat(trip.startOdometer));
+                document.getElementById('activeStartTime').textContent = new Date(trip.startTime).toLocaleTimeString();
+                
+                // Initialize real-time tracking variables
+                this.totalGpsDistance = 0;
+                this.tripStartTime = new Date(trip.startTime);
+                
+                // Initialize map with trip start location
+                if (trip.startLatitude && trip.startLongitude) {
+                    setTimeout(() => {
+                        this.initializeTripMap(trip.startLatitude, trip.startLongitude);
+                    }, 100); // Small delay to ensure DOM is ready
+                }
+                
+                // Start real-time distance updates
+                this.updateLiveDistance();
+                this.startLiveDistanceUpdates();
+            }
+
+            showMessage(message, type) {
+                // Show alert for error messages
+                if (type === 'error') {
+                    alert('Error: ' + message);
+                }
+                
+                const container = document.getElementById('messageContainer');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${type}`;
+                messageDiv.textContent = message;
+                container.appendChild(messageDiv);
+
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 5000);
+            }
+
+            // Email validation function
+            isValidEmail(email) {
+                const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                return emailRegex.test(email);
+            }
+
+            async getCurrentLocation() {
+                return new Promise((resolve, reject) => {
+                    if (!navigator.geolocation) {
+                        reject(new Error('Geolocation is not supported by this browser'));
+                        return;
+                    }
+
+                    const options = {
+                        enableHighAccuracy: true,
+                        timeout: 30000, // Increased timeout to 30 seconds
+                        maximumAge: 60000 // Allow cached location up to 1 minute old
+                    };
+
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            resolve({
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            });
+                        },
+                        (error) => {
+                            console.error('Location error:', error);
+                            let errorMessage = 'Unable to get location. ';
+                            switch(error.code) {
+                                case error.PERMISSION_DENIED:
+                                    errorMessage += 'Please allow location access.';
+                                    break;
+                                case error.POSITION_UNAVAILABLE:
+                                    errorMessage += 'Location information unavailable.';
+                                    break;
+                                case error.TIMEOUT:
+                                    errorMessage += 'Location request timed out. Please try again.';
+                                    break;
+                                default:
+                                    errorMessage += 'Unknown location error.';
+                                    break;
+                            }
+                            reject(new Error(errorMessage));
+                        },
+                        options
+                    );
+                });
+            }
+
+            // Map Management Functions
+            initializeTripMap(lat, lng) {
+                const mapContainer = document.getElementById('tripMap');
+                if (!mapContainer || this.tripMap) return;
+
+                try {
+                    // Initialize map
+                    this.tripMap = L.map(mapContainer).setView([lat, lng], 16);
+
+                    // Add different map layers
+                    this.mapLayers.street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors',
+                        maxZoom: 19
+                    });
+
+                    this.mapLayers.satellite = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenTopoMap contributors',
+                        maxZoom: 17
+                    });
+
+                    // Add default layer
+                    this.mapLayers.street.addTo(this.tripMap);
+
+                    // Add start marker
+                    this.startMarker = L.marker([lat, lng], {
+                        icon: L.divIcon({
+                            className: 'start-marker',
+                            html: '🚀',
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 15]
+                        })
+                    }).addTo(this.tripMap);
+
+                    // Add current location marker
+                    this.currentMarker = L.marker([lat, lng], {
+                        icon: L.divIcon({
+                            className: 'current-marker',
+                            html: '📍',
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 15]
+                        })
+                    }).addTo(this.tripMap);
+
+                    // Initialize route polyline
+                    this.routePolyline = L.polyline([], {
+                        color: '#28a745',
+                        weight: 4,
+                        opacity: 0.8
+                    }).addTo(this.tripMap);
+
+                    // Initialize route points array
+                    this.routePoints = [[lat, lng]];
+                    this.routePolyline.setLatLngs(this.routePoints);
+
+                    console.log('Trip map initialized successfully');
+                } catch (error) {
+                    console.error('Error initializing map:', error);
+                }
+            }
+
+            updateMapLocation(lat, lng) {
+                if (!this.tripMap || !this.currentMarker) return;
+
+                try {
+                    // Update current location marker
+                    this.currentMarker.setLatLng([lat, lng]);
+
+                    // Add point to route
+                    this.routePoints.push([lat, lng]);
+                    
+                    // Keep only last 1000 points to prevent performance issues
+                    if (this.routePoints.length > 1000) {
+                        this.routePoints = this.routePoints.slice(-1000);
+                    }
+
+                    // Update route polyline
+                    this.routePolyline.setLatLngs(this.routePoints);
+
+                    // Auto-center map on current location (with some bounds checking)
+                    const currentBounds = this.tripMap.getBounds();
+                    const currentCenter = this.tripMap.getCenter();
+                    const newLatLng = L.latLng(lat, lng);
+                    
+                    // Only pan if the new location is outside current view
+                    if (!currentBounds.contains(newLatLng)) {
+                        this.tripMap.panTo(newLatLng);
+                    }
+
+                } catch (error) {
+                    console.error('Error updating map location:', error);
+                }
+            }
+
+            toggleMapSize() {
+                const mapContainer = document.getElementById('tripMap');
+                if (!mapContainer) return;
+
+                mapContainer.classList.toggle('expanded');
+                
+                // Resize map after animation
+                setTimeout(() => {
+                    if (this.tripMap) {
+                        this.tripMap.invalidateSize();
+                    }
+                }, 300);
+            }
+
+            centerMapOnLocation() {
+                if (!this.tripMap || !this.currentLocation) return;
+                
+                this.tripMap.setView([
+                    this.currentLocation.latitude, 
+                    this.currentLocation.longitude
+                ], 16, { animate: true });
+            }
+
+            toggleMapLayer() {
+                if (!this.tripMap) return;
+
+                try {
+                    // Remove current layer
+                    if (this.mapLayers.currentLayer === 'street') {
+                        this.tripMap.removeLayer(this.mapLayers.street);
+                        this.mapLayers.satellite.addTo(this.tripMap);
+                        this.mapLayers.currentLayer = 'satellite';
+                    } else {
+                        this.tripMap.removeLayer(this.mapLayers.satellite);
+                        this.mapLayers.street.addTo(this.tripMap);
+                        this.mapLayers.currentLayer = 'street';
+                    }
+                } catch (error) {
+                    console.error('Error toggling map layer:', error);
+                }
+            }
+
+            destroyTripMap() {
+                if (this.tripMap) {
+                    this.tripMap.remove();
+                    this.tripMap = null;
+                    this.routePolyline = null;
+                    this.currentMarker = null;
+                    this.startMarker = null;
+                    this.routePoints = [];
+                }
+            }
+
+            displayTripHistory(trips) {
+                const historyList = document.getElementById('tripHistoryList');
+                
+                // Store trips data for full map access
+                this.currentTrips = trips;
+                console.log('Stored trips for full map access:', trips);
+                console.log('Trip IDs and types:', trips?.map(t => ({ id: t.id, type: typeof t.id, purpose: t.purpose })));
+                
+                if (!trips || trips.length === 0) {
+                    historyList.innerHTML = `
+                        <div class="empty-history">
+                            <h3>🚗 No trips yet</h3>
+                            <p>Start your first trip to see it here!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                historyList.innerHTML = trips.map((trip, index) => `
+                    <div class="trip-card">
+                        <div class="trip-card-header">
+                            <div class="trip-card-title">${trip.purpose}</div>
+                            <div class="trip-card-date">${new Date(trip.startDate).toLocaleDateString()}</div>
+                        </div>
+                        
+                        <div class="trip-distance">
+                            📏 Distance Traveled: ${this.roundDistance(trip.totalDistance)} km
+                        </div>
+                        
+                        ${trip.startLatitude && trip.startLongitude ? `
+                        <div class="trip-map-preview" id="tripMap_${trip.id}">
+                            <div style="height: 200px; border-radius: 8px; background: #f0f0f0; position: relative;">
+                                <div style="position: absolute; top: 5px; right: 5px; z-index: 1000;">
+                                    <button class="map-control-btn" onclick="tripApp.showFullTripMap(${trip.id})" title="View Full Map">🔍</button>
+                                </div>
+                                ${trip.routePoints && trip.routePoints.length > 0 ? 
+                                    `<div style="position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">
+                                        📍 ${trip.routePoints.length} route points
+                                    </div>` : 
+                                    `<div style="position: absolute; bottom: 5px; left: 5px; background: rgba(255,193,7,0.9); color: black; padding: 4px 8px; border-radius: 4px; font-size: 0.8em;">
+                                        📍 Basic location only
+                                    </div>`
+                                }
+                            </div>
+                        </div>
+                        ` : `
+                        <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 15px; margin: 10px 0; text-align: center; color: #721c24;">
+                            📍 No location data available for this trip
+                        </div>
+                        `}
+                        
+                        <div class="trip-card-details">
+                            <div class="trip-detail">
+                                <span class="trip-detail-label">Start Odometer:</span>
+                                <span class="trip-detail-value">${this.roundDistance(trip.startOdometer)} km</span>
+                            </div>
+                            <div class="trip-detail">
+                                <span class="trip-detail-label">End Odometer:</span>
+                                <span class="trip-detail-value">${this.roundDistance(trip.endOdometer)} km</span>
+                            </div>
+                            <div class="trip-detail">
+                                <span class="trip-detail-label">Start Time:</span>
+                                <span class="trip-detail-value">${new Date(trip.startTime).toLocaleTimeString()}</span>
+                            </div>
+                            <div class="trip-detail">
+                                <span class="trip-detail-label">End Time:</span>
+                                <span class="trip-detail-value">${new Date(trip.endTime).toLocaleTimeString()}</span>
+                            </div>
+                            ${trip.startArea && trip.startArea !== 'Unknown Area' ? `
+                            <div class="trip-detail">
+                                <span class="trip-detail-label">From:</span>
+                                <span class="trip-detail-value">${trip.startArea}</span>
+                            </div>
+                            ` : ''}
+                            ${trip.endArea && trip.endArea !== 'Unknown Area' ? `
+                            <div class="trip-detail">
+                                <span class="trip-detail-label">To:</span>
+                                <span class="trip-detail-value">${trip.endArea}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        
+                        <div style="text-align: right; margin-top: 10px;">
+                            <button class="delete-trip-btn" onclick="tripApp.deleteTrip(${trip.id})">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Initialize maps for trips with location data
+                setTimeout(() => {
+                    trips.forEach(trip => {
+                        if (trip.startLatitude && trip.startLongitude) {
+                            this.initializeTripHistoryMap(trip);
+                        }
+                    });
+                }, 100);
+            }
+
+            initializeTripHistoryMap(trip) {
+                const mapContainer = document.getElementById(`tripMap_${trip.id}`).firstElementChild;
+                if (!mapContainer) return;
+
+                try {
+                    const historyMap = L.map(mapContainer);
+                    
+                    // Add map layer
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors',
+                        maxZoom: 19
+                    }).addTo(historyMap);
+
+                    // Add start and end markers
+                    const startMarker = L.marker([trip.startLatitude, trip.startLongitude], {
+                        icon: L.divIcon({
+                            className: 'start-marker',
+                            html: '🚀',
+                            iconSize: [25, 25],
+                            iconAnchor: [12, 12]
+                        })
+                    }).addTo(historyMap);
+
+                    if (trip.endLatitude && trip.endLongitude) {
+                        const endMarker = L.marker([trip.endLatitude, trip.endLongitude], {
+                            icon: L.divIcon({
+                                className: 'end-marker',
+                                html: '🏁',
+                                iconSize: [25, 25],
+                                iconAnchor: [12, 12]
+                            })
+                        }).addTo(historyMap);
+                    }
+
+                    // Add route if available
+                    if (trip.routePoints && trip.routePoints.length > 1) {
+                        const routeLatLngs = trip.routePoints.map(point => [point.latitude, point.longitude]);
+                        L.polyline(routeLatLngs, {
+                            color: '#28a745',
+                            weight: 3,
+                            opacity: 0.8
+                        }).addTo(historyMap);
+                    }
+
+                    // Fit map to show the route
+                    const bounds = L.latLngBounds([[trip.startLatitude, trip.startLongitude]]);
+                    if (trip.endLatitude && trip.endLongitude) {
+                        bounds.extend([trip.endLatitude, trip.endLongitude]);
+                    }
+                    if (trip.routePoints && trip.routePoints.length > 0) {
+                        trip.routePoints.forEach(point => {
+                            bounds.extend([point.latitude, point.longitude]);
+                        });
+                    }
+                    
+                    historyMap.fitBounds(bounds, { padding: [10, 10] });
+
+                    console.log(`History map initialized for trip ${trip.id}`);
+                } catch (error) {
+                    console.error(`Error initializing history map for trip ${trip.id}:`, error);
+                }
+            }
+
+            async showFullTripMap(tripId) {
+                console.log('Attempting to show full map for trip ID:', tripId);
+                console.log('Available trips:', this.currentTrips);
+                
+                // Find the trip data - try both string and number comparison
+                let trip = this.currentTrips?.find(t => t.id === tripId);
+                
+                if (!trip) {
+                    // Try converting to number in case of type mismatch
+                    trip = this.currentTrips?.find(t => t.id == tripId || t.id === parseInt(tripId));
+                }
+                
+                if (!trip && (!this.currentTrips || this.currentTrips.length === 0)) {
+                    // If no trips are loaded, try loading them first
+                    console.log('No trips loaded, attempting to reload...');
+                    try {
+                        await this.loadTripHistory();
+                        
+                        // Try finding the trip again after loading
+                        trip = this.currentTrips?.find(t => t.id === tripId || t.id == tripId || t.id === parseInt(tripId));
+                    } catch (error) {
+                        console.error('Failed to reload trip history:', error);
+                    }
+                }
+                
+                if (!trip) {
+                    console.error('Trip not found for ID:', tripId);
+                    console.log('Available trip IDs:', this.currentTrips?.map(t => ({ id: t.id, type: typeof t.id })));
+                    alert(`Trip not found (ID: ${tripId}). Please refresh the page and try again.`);
+                    return;
+                }
+
+                console.log('Found trip:', trip);
+                this.currentFullMapTrip = trip;
+                this.openFullMapModal(trip);
+            }
+
+            openFullMapModal(trip) {
+                const modal = document.getElementById('fullMapModal');
+                const title = document.getElementById('fullMapTitle');
+                const container = document.getElementById('fullMapContainer');
+                
+                // Validate trip has required location data
+                if (!trip.startLatitude || !trip.startLongitude) {
+                    alert('This trip does not have location data and cannot be displayed on the map.');
+                    return;
+                }
+                
+                // Set modal title
+                title.textContent = `${trip.purpose} - ${new Date(trip.startDate).toLocaleDateString()}`;
+                
+                // Show loading indicator
+                container.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f8f9fa;">
+                        <div style="text-align: center;">
+                            <div class="spinner" style="margin: 0 auto 20px;"></div>
+                            <p>Loading detailed map...</p>
+                        </div>
+                    </div>
+                `;
+                
+                // Show modal
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                
+                // Initialize full map after a short delay to ensure modal is visible
+                setTimeout(() => {
+                    try {
+                        this.initializeFullMap(trip);
+                        this.populateFullMapSidebar(trip);
+                    } catch (error) {
+                        console.error('Error initializing full map:', error);
+                        container.innerHTML = `
+                            <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f8f9fa;">
+                                <div style="text-align: center; color: #dc3545;">
+                                    <h3>Error Loading Map</h3>
+                                    <p>Unable to load the map for this trip.</p>
+                                    <button class="btn btn-primary" onclick="tripApp.closeFullMapModal()">Close</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }, 300);
+            }
+
+            initializeFullMap(trip) {
+                const container = document.getElementById('fullMapContainer');
+                
+                // Destroy existing map if any
+                if (this.fullMap) {
+                    this.fullMap.remove();
+                }
+                
+                try {
+                    // Create new map
+                    this.fullMap = L.map(container).setView([trip.startLatitude, trip.startLongitude], 13);
+                    
+                    // Add map layers
+                    this.fullMapLayers = {
+                        street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '© OpenStreetMap contributors',
+                            maxZoom: 19
+                        }),
+                        satellite: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                            attribution: '© OpenTopoMap contributors',
+                            maxZoom: 17
+                        })
+                    };
+                    
+                    this.fullMapLayers.street.addTo(this.fullMap);
+                    this.currentFullMapLayer = 'street';
+                    
+                    // Add start marker with popup
+                    const startMarker = L.marker([trip.startLatitude, trip.startLongitude], {
+                        icon: L.divIcon({
+                            className: 'start-marker-full',
+                            html: '🚀',
+                            iconSize: [35, 35],
+                            iconAnchor: [17, 17]
+                        })
+                    }).addTo(this.fullMap);
+                    
+                    startMarker.bindPopup(`
+                        <strong>🚀 Trip Start</strong><br>
+                        ${trip.startArea || 'Unknown Area'}<br>
+                        ${new Date(trip.startTime).toLocaleString()}
+                    `);
+                    
+                    // Add end marker with popup if trip is completed
+                    if (trip.endLatitude && trip.endLongitude) {
+                        const endMarker = L.marker([trip.endLatitude, trip.endLongitude], {
+                            icon: L.divIcon({
+                                className: 'end-marker-full',
+                                html: '🏁',
+                                iconSize: [35, 35],
+                                iconAnchor: [17, 17]
+                            })
+                        }).addTo(this.fullMap);
+                        
+                        endMarker.bindPopup(`
+                            <strong>🏁 Trip End</strong><br>
+                            ${trip.endArea || 'Unknown Area'}<br>
+                            ${new Date(trip.endTime).toLocaleString()}
+                        `);
+                    }
+                    
+                    // Add route polyline if available
+                    if (trip.routePoints && trip.routePoints.length > 1) {
+                        const routeLatLngs = trip.routePoints.map(point => [point.latitude, point.longitude]);
+                        
+                        this.fullMapRoute = L.polyline(routeLatLngs, {
+                            color: '#28a745',
+                            weight: 4,
+                            opacity: 0.8
+                        }).addTo(this.fullMap);
+                        
+                        // Add distance markers every few kilometers
+                        this.addDistanceMarkers(trip);
+                    }
+                    
+                    // Fit map to show entire route
+                    this.fitFullMapRoute();
+                    
+                } catch (error) {
+                    console.error('Error initializing full map:', error);
+                }
+            }
+
+            addDistanceMarkers(trip) {
+                if (!trip.routePoints || trip.routePoints.length < 2) return;
+                
+                let totalDistance = 0;
+                let markerDistance = 0;
+                const markerInterval = 1; // Add marker every 1 km
+                
+                for (let i = 1; i < trip.routePoints.length; i++) {
+                    const prevPoint = trip.routePoints[i - 1];
+                    const currentPoint = trip.routePoints[i];
+                    
+                    const segmentDistance = this.calculateDistance(
+                        prevPoint.latitude, prevPoint.longitude,
+                        currentPoint.latitude, currentPoint.longitude
+                    );
+                    
+                    totalDistance += segmentDistance;
+                    markerDistance += segmentDistance;
+                    
+                    // Add distance marker every kilometer
+                    if (markerDistance >= markerInterval) {
+                        L.circleMarker([currentPoint.latitude, currentPoint.longitude], {
+                            radius: 6,
+                            fillColor: '#007bff',
+                            color: '#fff',
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).addTo(this.fullMap).bindPopup(`📏 ${totalDistance.toFixed(2)} km`);
+                        
+                        markerDistance = 0;
+                    }
+                }
+            }
+
+            populateFullMapSidebar(trip) {
+                // Calculate trip statistics
+                const startTime = new Date(trip.startTime);
+                const endTime = trip.endTime ? new Date(trip.endTime) : null;
+                const duration = endTime ? (endTime - startTime) / (1000 * 60) : 0; // minutes
+                const avgSpeed = duration > 0 ? (trip.totalDistance / (duration / 60)) : 0; // km/h
+                
+                // Calculate additional statistics
+                let maxSpeed = 0;
+                let totalRouteDistance = 0;
+                
+                if (trip.routePoints && trip.routePoints.length > 1) {
+                    for (let i = 1; i < trip.routePoints.length; i++) {
+                        const prev = trip.routePoints[i - 1];
+                        const curr = trip.routePoints[i];
+                        const timeDiff = (new Date(curr.timestamp) - new Date(prev.timestamp)) / 1000; // seconds
+                        const distance = this.calculateDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+                        
+                        totalRouteDistance += distance;
+                        
+                        if (timeDiff > 0) {
+                            const speed = (distance / timeDiff) * 3.6; // km/h
+                            maxSpeed = Math.max(maxSpeed, speed);
+                        }
+                    }
+                }
+                
+                // Populate statistics
+                document.getElementById('statPurpose').textContent = trip.purpose;
+                document.getElementById('statDate').textContent = new Date(trip.startDate).toLocaleDateString();
+                document.getElementById('statDistance').textContent = `${trip.totalDistance.toFixed(2)} km`;
+                document.getElementById('statDuration').textContent = duration > 0 ? this.formatDuration(duration) : 'N/A';
+                document.getElementById('statAvgSpeed').textContent = avgSpeed > 0 ? `${avgSpeed.toFixed(1)} km/h` : 'N/A';
+                document.getElementById('statStartArea').textContent = trip.startArea || 'Unknown';
+                document.getElementById('statEndArea').textContent = trip.endArea || 'Unknown';
+                document.getElementById('statRoutePoints').textContent = trip.routePoints ? trip.routePoints.length : 0;
+                document.getElementById('statStartTime').textContent = startTime.toLocaleTimeString();
+                document.getElementById('statEndTime').textContent = endTime ? endTime.toLocaleTimeString() : 'N/A';
+                
+                // Populate speed analysis
+                document.getElementById('statMaxSpeed').textContent = maxSpeed > 0 ? `${maxSpeed.toFixed(1)} km/h` : 'N/A';
+                document.getElementById('statGpsDistance').textContent = totalRouteDistance > 0 ? `${totalRouteDistance.toFixed(3)} km` : 'N/A';
+                
+                // Calculate average accuracy if route points available
+                let avgAccuracy = 0;
+                if (trip.routePoints && trip.routePoints.length > 0) {
+                    const totalAccuracy = trip.routePoints.reduce((sum, point) => sum + (point.accuracy || 0), 0);
+                    avgAccuracy = totalAccuracy / trip.routePoints.length;
+                }
+                document.getElementById('statAccuracy').textContent = avgAccuracy > 0 ? `${avgAccuracy.toFixed(1)}m` : 'N/A';
+                
+                // Populate route points list
+                this.populateRoutePointsList(trip);
+            }
+
+            populateRoutePointsList(trip) {
+                const container = document.getElementById('routePointsList');
+                
+                if (!trip.routePoints || trip.routePoints.length === 0) {
+                    container.innerHTML = '<div class="route-point-item">No route data available</div>';
+                    return;
+                }
+                
+                // Show key points (start, every few points, end)
+                const keyPoints = [];
+                const pointInterval = Math.max(1, Math.floor(trip.routePoints.length / 10));
+                
+                for (let i = 0; i < trip.routePoints.length; i += pointInterval) {
+                    keyPoints.push({ index: i, point: trip.routePoints[i] });
+                }
+                
+                // Ensure we include the last point
+                if (keyPoints[keyPoints.length - 1].index !== trip.routePoints.length - 1) {
+                    keyPoints.push({ 
+                        index: trip.routePoints.length - 1, 
+                        point: trip.routePoints[trip.routePoints.length - 1] 
+                    });
+                }
+                
+                container.innerHTML = keyPoints.map(({ index, point }) => {
+                    const pointTime = new Date(point.timestamp).toLocaleTimeString();
+                    const isStart = index === 0;
+                    const isEnd = index === trip.routePoints.length - 1;
+                    
+                    let label = `Point ${index + 1}`;
+                    if (isStart) label = '🚀 Start';
+                    else if (isEnd) label = '🏁 End';
+                    
+                    return `
+                        <div class="route-point-item">
+                            <strong>${label}</strong><br>
+                            ${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}<br>
+                            <span class="route-point-time">${pointTime}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            closeFullMapModal() {
+                const modal = document.getElementById('fullMapModal');
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+                
+                // Clean up map
+                if (this.fullMap) {
+                    this.fullMap.remove();
+                    this.fullMap = null;
+                    this.fullMapRoute = null;
+                }
+            }
+
+            fitFullMapRoute() {
+                if (!this.fullMap || !this.currentFullMapTrip) return;
+                
+                const trip = this.currentFullMapTrip;
+                const bounds = L.latLngBounds([[trip.startLatitude, trip.startLongitude]]);
+                
+                if (trip.endLatitude && trip.endLongitude) {
+                    bounds.extend([trip.endLatitude, trip.endLongitude]);
+                }
+                
+                if (trip.routePoints && trip.routePoints.length > 0) {
+                    trip.routePoints.forEach(point => {
+                        bounds.extend([point.latitude, point.longitude]);
+                    });
+                }
+                
+                this.fullMap.fitBounds(bounds, { padding: [20, 20] });
+            }
+
+            centerFullMap() {
+                if (!this.fullMap || !this.currentFullMapTrip) return;
+                
+                const trip = this.currentFullMapTrip;
+                // Center on start location
+                this.fullMap.setView([trip.startLatitude, trip.startLongitude], 15);
+            }
+
+            toggleFullMapLayer() {
+                if (!this.fullMap || !this.fullMapLayers) return;
+                
+                try {
+                    if (this.currentFullMapLayer === 'street') {
+                        this.fullMap.removeLayer(this.fullMapLayers.street);
+                        this.fullMapLayers.satellite.addTo(this.fullMap);
+                        this.currentFullMapLayer = 'satellite';
+                    } else {
+                        this.fullMap.removeLayer(this.fullMapLayers.satellite);
+                        this.fullMapLayers.street.addTo(this.fullMap);
+                        this.currentFullMapLayer = 'street';
+                    }
+                } catch (error) {
+                    console.error('Error toggling full map layer:', error);
+                }
+            }
+
+            zoomFullMapIn() {
+                if (this.fullMap) {
+                    this.fullMap.zoomIn();
+                }
+            }
+
+            zoomFullMapOut() {
+                if (this.fullMap) {
+                    this.fullMap.zoomOut();
+                }
+            }
+
+            async deleteTrip(tripId) {
+                if (!confirm('Are you sure you want to delete this trip?')) {
+                    return;
+                }
+
+                try {
+                    const headers = { 'Authorization': `Bearer ${this.token}` };
+                    const response = await fetch(`/api/trip/${tripId}`, {
+                        method: 'DELETE',
+                        headers
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showMessage('Trip deleted successfully', 'success');
+                        await this.loadTripHistory(); // Refresh the list
+                    } else {
+                        this.showMessage(data.error, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting trip:', error);
+                    this.showMessage('Error deleting trip', 'error');
+                }
+            }
+
+            async startTrip() {
+                try {
+                    const odometerValue = document.getElementById('currentOdometer').value;
+                    const date = document.getElementById('tripDate').value;
+                    const purpose = document.getElementById('tripPurpose').value.trim();
+
+                    if (!odometerValue || !date || !purpose) {
+                        this.showMessage('Please fill in all fields', 'error');
+                        return;
+                    }
+
+                    // Validate that the selected date is not in the past
+                    const today = new Date().toISOString().split('T')[0];
+                    if (date < today) {
+                        this.showMessage('Cannot select a past date for trip', 'error');
+                        return;
+                    }
+
+                    if (parseFloat(odometerValue) < 0) {
+                        this.showMessage('Odometer reading must be a positive number', 'error');
+                        return;
+                    }
+
+                    const headers = { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    };
+
+                    // Update odometer first
+                    await fetch('/api/odometer', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ odometer: parseFloat(odometerValue) })
+                    });
+
+                    this.updateOdometerDisplay(parseFloat(odometerValue));
+
+                    // Show location status
+                    const locationStatus = document.getElementById('locationStatus');
+                    locationStatus.classList.remove('hidden');
+                    locationStatus.textContent = '📍 Requesting location permission...';
+
+                    // Get current location
+                    const location = await this.getCurrentLocation();
+                    locationStatus.textContent = '📍 Location acquired! Starting trip...';
+
+                    // Start trip
+                    const response = await fetch('/api/trip/start', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({
+                            purpose,
+                            date,
+                            latitude: location.latitude,
+                            longitude: location.longitude
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        this.displayActiveTrip(result.trip);
+                        this.showMessage('Trip started successfully! 🚗', 'success');
+                        locationStatus.classList.add('hidden');
+                        
+                        // Start continuous GPS tracking and real-time updates
+                        this.startLocationWatch();
+                        
+                        // Enable background tracking
+                        this.enableBackgroundTracking();
+                    } else {
+                        throw new Error(result.error || 'Failed to start trip');
+                    }
+
+                } catch (error) {
+                    console.error('Error starting trip:', error);
+                    document.getElementById('locationStatus').classList.add('hidden');
+                    
+                    if (error.code === 1) {
+                        this.showMessage('Location permission denied. Please allow location access.', 'error');
+                    } else if (error.code === 2) {
+                        this.showMessage('Location unavailable. Please check your GPS.', 'error');
+                    } else if (error.code === 3) {
+                        this.showMessage('Location request timed out. Please try again.', 'error');
+                    } else {
+                        this.showMessage('Error starting trip: ' + error.message, 'error');
+                    }
+                }
+            }
+
+            // Haversine formula to calculate distance between two GPS points
+            calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // Earth's radius in kilometers
+                const dLat = this.toRadians(lat2 - lat1);
+                const dLon = this.toRadians(lon2 - lon1);
+                const a = 
+                    Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) * 
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c; // Distance in kilometers
+            }
+
+            toRadians(degrees) {
+                return degrees * (Math.PI/180);
+            }
+
+            startLocationWatch() {
+                if (navigator.geolocation) {
+                    const options = {
+                        enableHighAccuracy: true,
+                        timeout: 15000, // Longer timeout for better accuracy
+                        maximumAge: 2000 // Allow slightly older positions (2 seconds)
+                    };
+
+                    // Initialize tracking variables
+                    this.totalGpsDistance = 0;
+                    this.lastKnownPosition = null;
+                    this.gpsPoints = []; // Store GPS points for analysis
+                    this.lastValidTime = Date.now();
+                    this.gpsUpdateCount = 0;
+                    
+                    console.log('GPS Tracking Initialized - Starting enhanced location tracking...');
+                    
+                    // Primary GPS tracking with watchPosition
+                    this.watchId = navigator.geolocation.watchPosition(
+                        (position) => this.processGPSPosition(position),
+                        (error) => {
+                            console.warn('Location watch error:', error.message);
+                            this.handleLocationError(error);
+                        },
+                        options
+                    );
+
+                    // Backup GPS tracking with more frequent getCurrentPosition calls
+                    this.backupGpsInterval = setInterval(() => {
+                        navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                                this.processGPSPosition(position);
+                            },
+                            (error) => {
+                                console.log('Backup GPS error:', error.message);
+                            },
+                            { 
+                                enableHighAccuracy: true, 
+                                timeout: 8000, 
+                                maximumAge: 1000 
+                            }
+                        );
+                    }, 5000); // Every 5 seconds as backup
+
+                    // Keep screen awake if Wake Lock API is available
+                    this.requestWakeLock();
+                }
+            }
+
+            async requestWakeLock() {
+                try {
+                    if ('wakeLock' in navigator) {
+                        this.wakeLock = await navigator.wakeLock.request('screen');
+                        console.log('Screen wake lock activated');
+                        
+                        this.wakeLock.addEventListener('release', () => {
+                            console.log('Screen wake lock released');
+                        });
+                    }
+                } catch (error) {
+                    console.log('Wake lock not supported or failed:', error.message);
+                }
+            }
+
+            releaseWakeLock() {
+                if (this.wakeLock) {
+                    this.wakeLock.release();
+                    this.wakeLock = null;
+                }
+            }
+
+            enableBackgroundTracking() {
+                try {
+                    // Register background sync if service worker is available
+                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.controller.postMessage({
+                            type: 'START_BACKGROUND_TRACKING'
+                        });
+                        console.log('Background tracking enabled');
+                    }
+                    
+                    // Listen for visibility changes to handle background mode
+                    document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
+                    
+                    // Listen for beforeunload to ensure tracking continues
+                    window.addEventListener('beforeunload', this.handleBeforeUnload.bind(this));
+                    
+                } catch (error) {
+                    console.error('Failed to enable background tracking:', error);
+                }
+            }
+
+            disableBackgroundTracking() {
+                try {
+                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.controller.postMessage({
+                            type: 'STOP_BACKGROUND_TRACKING'
+                        });
+                        console.log('Background tracking disabled');
+                    }
+                    
+                    // Remove event listeners
+                    document.removeEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
+                    window.removeEventListener('beforeunload', this.handleBeforeUnload.bind(this));
+                    
+                } catch (error) {
+                    console.error('Failed to disable background tracking:', error);
+                }
+            }
+
+            handleVisibilityChange() {
+                if (document.hidden) {
+                    console.log('App moved to background - GPS tracking continues');
+                    
+                    // Ensure GPS tracking continues in background
+                    if (this.watchId) {
+                        console.log('Maintaining GPS tracking in background mode');
+                    }
+                } else {
+                    console.log('App returned to foreground');
+                    
+                    // Refresh data when coming back to foreground
+                    if (this.token) {
+                        this.loadAppData();
+                        this.loadTripHistory();
+                    }
+                }
+            }
+
+            handleBeforeUnload(event) {
+                // Warn user if they're trying to close during active trip
+                if (this.watchId) {
+                    const message = 'You have an active trip running. Closing the app may stop GPS tracking.';
+                    event.returnValue = message;
+                    return message;
+                }
+            }
+
+            handleLocationError(error) {
+                let errorMessage = '';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = 'Location access denied. Please enable location services.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = 'Location unavailable. Trying to reconnect...';
+                        this.retryLocationWatch();
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = 'Location timeout. Continuing with backup tracking...';
+                        break;
+                    default:
+                        errorMessage = 'Unknown location error. Continuing tracking...';
+                        break;
+                }
+                console.warn('GPS Error:', errorMessage);
+            }
+
+            retryLocationWatch() {
+                // Retry location watch after a delay
+                setTimeout(() => {
+                    if (!this.watchId) {
+                        console.log('Retrying GPS connection...');
+                        this.startLocationWatch();
+                    }
+                }, 10000); // Retry after 10 seconds
+            }
+
+            processGPSPosition(position) {
+                const newLocation = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                    timestamp: position.timestamp,
+                    speed: position.coords.speed // Speed from GPS if available
+                };
+
+                console.log(`GPS Update Received: lat=${newLocation.latitude.toFixed(6)}, lng=${newLocation.longitude.toFixed(6)}, accuracy=${newLocation.accuracy}m`);
+
+                // Update current location
+                this.currentLocation = newLocation;
+                
+                // Update map location
+                this.updateMapLocation(newLocation.latitude, newLocation.longitude);
+                
+                // Store GPS point
+                this.gpsPoints.push(newLocation);
+                
+                // Keep only last 10 GPS points to prevent memory issues
+                if (this.gpsPoints.length > 10) {
+                    this.gpsPoints.shift();
+                }
+
+                // Enhanced GPS filtering and distance calculation
+                if (this.lastKnownPosition) {
+                    const timeDiff = (newLocation.timestamp - this.lastKnownPosition.timestamp) / 1000; // seconds
+                    const incrementalDistance = this.calculateDistance(
+                        this.lastKnownPosition.latitude,
+                        this.lastKnownPosition.longitude,
+                        newLocation.latitude,
+                        newLocation.longitude
+                    );
+
+                    // Enhanced filtering logic for real-world GPS tracking
+                    const shouldAcceptPoint = this.isValidGPSPoint(
+                        incrementalDistance, 
+                        timeDiff, 
+                        newLocation.accuracy,
+                        this.lastKnownPosition.accuracy
+                    );
+
+                    if (shouldAcceptPoint) {
+                        this.totalGpsDistance += incrementalDistance;
+                        this.lastValidTime = Date.now();
+                        
+                        console.log(`GPS Distance update: +${incrementalDistance.toFixed(4)} km, Total: ${this.totalGpsDistance.toFixed(3)} km, Accuracy: ${newLocation.accuracy}m`);
+                        
+                        // Immediate UI update for responsive feedback
+                        this.updateLiveDistance();
+                        
+                        // Show movement notification
+                        if (incrementalDistance > 0.001) {
+                            this.showMovementIndicator();
+                        }
+                        
+                        // Send route point to server periodically
+                        this.sendRoutePointToServer(newLocation);
+                        
+                        // Update last known position only if we accepted the point
+                        this.lastKnownPosition = newLocation;
+                    } else {
+                        console.log(`GPS point rejected: distance=${incrementalDistance.toFixed(4)}km, accuracy=${newLocation.accuracy}m, timeDiff=${timeDiff}s`);
+                    }
+                } else {
+                    // First GPS point
+                    this.lastKnownPosition = newLocation;
+                    console.log(`First GPS point set: ${newLocation.latitude}, ${newLocation.longitude}, accuracy: ${newLocation.accuracy}m`);
+                }
+            }
+
+            // Enhanced GPS point validation for real-world tracking
+            isValidGPSPoint(distance, timeDiff, currentAccuracy, lastAccuracy) {
+                // Accept point if no previous position
+                if (!this.lastKnownPosition) return true;
+                
+                // Improved validation for real-world mobile GPS tracking
+                
+                // Minimum time between updates (prevent rapid-fire updates)
+                if (timeDiff < 1) return false;
+                
+                // Dynamic accuracy threshold based on device capabilities
+                let accuracyThreshold = 100; // Start with 100m for good GPS
+                
+                // Adjust accuracy threshold based on current GPS quality
+                if (currentAccuracy > 50) {
+                    accuracyThreshold = Math.min(currentAccuracy * 2, 300); // Allow 2x current accuracy, max 300m
+                }
+                
+                // If we haven't had a valid GPS point in a while, be more lenient
+                const timeSinceLastValid = (Date.now() - this.lastValidTime) / 1000;
+                if (timeSinceLastValid > 30) {
+                    accuracyThreshold = Math.min(accuracyThreshold * 2, 500);
+                }
+                
+                // Calculate speed for validation
+                const calculatedSpeed = (distance / timeDiff) * 3.6; // m/s to km/h
+                
+                // Reasonable speed validation for vehicles (allow up to 200 km/h for highways)
+                const maxSpeedKmh = 200;
+                const withinSpeedLimit = calculatedSpeed <= maxSpeedKmh;
+                
+                // Distance validation - filter out obvious GPS jumps
+                const maxDistance = Math.max(0.1, (calculatedSpeed / 3.6) * timeDiff * 2); // Allow 2x expected distance
+                const reasonableDistance = distance <= maxDistance;
+                
+                // Accuracy validation
+                const withinAccuracy = currentAccuracy <= accuracyThreshold;
+                
+                // Minimum movement threshold (ignore tiny movements that could be GPS drift)
+                const minMovement = currentAccuracy > 20 ? 0.005 : 0.002; // 5m or 2m depending on accuracy
+                const sufficientMovement = distance >= minMovement;
+                
+                // Accept point if it passes all checks
+                const validPoint = withinAccuracy && withinSpeedLimit && reasonableDistance && sufficientMovement;
+                
+                // Enhanced logging for debugging GPS tracking
+                if (distance > 0.001) { // Only log significant movements
+                    console.log(`GPS Analysis: dist=${distance.toFixed(4)}km, time=${timeDiff}s, speed=${calculatedSpeed.toFixed(1)}km/h, acc=${currentAccuracy}m`);
+                    
+                    if (!validPoint) {
+                        console.log(`GPS REJECTED - acc:${withinAccuracy}(${currentAccuracy}<=${accuracyThreshold}), speed:${withinSpeedLimit}(${calculatedSpeed.toFixed(1)}<=${maxSpeedKmh}), dist:${reasonableDistance}(${distance.toFixed(4)}<=${maxDistance.toFixed(4)}), move:${sufficientMovement}(${distance.toFixed(4)}>=${minMovement})`);
+                    }
+                }
+                
+                return validPoint;
+            }
+
+            sendRoutePointToServer(location) {
+                // Send route points every 30 seconds or every 100 meters to avoid overwhelming server
+                const now = Date.now();
+                
+                if (!this.lastRoutePointSent) {
+                    this.lastRoutePointSent = { time: now, location: location };
+                    return;
+                }
+                
+                const timeSinceLastSent = (now - this.lastRoutePointSent.time) / 1000;
+                const distanceSinceLastSent = this.calculateDistance(
+                    this.lastRoutePointSent.location.latitude,
+                    this.lastRoutePointSent.location.longitude,
+                    location.latitude,
+                    location.longitude
+                );
+                
+                // Send if 30 seconds have passed OR if moved more than 100 meters
+                if (timeSinceLastSent >= 30 || distanceSinceLastSent >= 0.1) {
+                    try {
+                        fetch('/api/trip/route', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.token}`
+                            },
+                            body: JSON.stringify({
+                                latitude: location.latitude,
+                                longitude: location.longitude,
+                                accuracy: location.accuracy
+                            })
+                        }).catch(error => {
+                            console.warn('Failed to send route point:', error);
+                        });
+                        
+                        this.lastRoutePointSent = { time: now, location: location };
+                    } catch (error) {
+                        console.warn('Error sending route point:', error);
+                    }
+                }
+            }
+
+            updateLiveDistance() {
+                try {
+                    // Update distance
+                    const distanceElement = document.getElementById('currentDistance');
+                    if (distanceElement) {
+                        const distance = this.totalGpsDistance || 0;
+                        distanceElement.textContent = `${distance.toFixed(2)} km`;
+                    }
+
+                    // Update duration
+                    const durationElement = document.getElementById('currentDuration');
+                    if (durationElement) {
+                        const duration = this.getTripDuration();
+                        durationElement.textContent = this.formatDuration(duration);
+                    }
+
+                    // Update average speed
+                    const speedElement = document.getElementById('avgSpeed');
+                    if (speedElement) {
+                        const duration = this.getTripDuration();
+                        const avgSpeed = duration > 0 ? (this.totalGpsDistance / (duration / 60)) : 0;
+                        speedElement.textContent = `${avgSpeed.toFixed(1)} km/h`;
+                    }
+
+                    // Update GPS quality
+                    const gpsQuality = this.getGPSQuality();
+                    const gpsIconElement = document.getElementById('gpsQualityIcon');
+                    const gpsTextElement = document.getElementById('gpsQualityText');
+                    
+                    if (gpsIconElement && gpsTextElement) {
+                        gpsIconElement.textContent = gpsQuality.icon;
+                        gpsTextElement.textContent = gpsQuality.text;
+                    }
+                } catch (error) {
+                    console.error('Error updating live distance:', error);
+                }
+            }
+
+            getGPSQuality() {
+                if (!this.currentLocation) {
+                    return { icon: '📡', text: 'Acquiring signal...' };
+                }
+                
+                const accuracy = this.currentLocation.accuracy;
+                
+                if (accuracy <= 5) {
+                    return { icon: '🟢', text: `Excellent (${accuracy}m)` };
+                } else if (accuracy <= 15) {
+                    return { icon: '🟡', text: `Good (${accuracy}m)` };
+                } else if (accuracy <= 50) {
+                    return { icon: '🟠', text: `Fair (${accuracy}m)` };
+                } else {
+                    return { icon: '🔴', text: `Poor (${accuracy}m)` };
+                }
+            }
+
+            getTripDuration() {
+                // Calculate duration in minutes since trip started
+                if (!this.tripStartTime) {
+                    this.tripStartTime = new Date();
+                    return 0;
+                }
+                return (new Date() - this.tripStartTime) / (1000 * 60); // Convert to minutes
+            }
+
+            formatDuration(minutes) {
+                const hours = Math.floor(minutes / 60);
+                const mins = Math.floor(minutes % 60);
+                if (hours > 0) {
+                    return `${hours}h ${mins}m`;
+                }
+                return `${mins}m`;
+            }
+
+            startLiveDistanceUpdates() {
+                // Update display every 5 seconds for smooth real-time updates
+                this.liveUpdateInterval = setInterval(() => {
+                    this.updateLiveDistance();
+                }, 5000);
+            }
+
+            stopLiveDistanceUpdates() {
+                if (this.liveUpdateInterval) {
+                    clearInterval(this.liveUpdateInterval);
+                    this.liveUpdateInterval = null;
+                }
+            }
+
+            showMovementIndicator() {
+                // Show a subtle movement indicator
+                const liveElement = document.getElementById('liveDistance');
+                if (liveElement) {
+                    liveElement.style.backgroundColor = '#e8f5e8';
+                    liveElement.style.transition = 'background-color 0.3s ease';
+                    
+                    setTimeout(() => {
+                        liveElement.style.backgroundColor = '';
+                    }, 300);
+                }
+            }
+
+            stopLocationWatch() {
+                if (this.watchId) {
+                    navigator.geolocation.clearWatch(this.watchId);
+                    this.watchId = null;
+                }
+                if (this.backupGpsInterval) {
+                    clearInterval(this.backupGpsInterval);
+                    this.backupGpsInterval = null;
+                }
+                
+                // Release wake lock
+                this.releaseWakeLock();
+                
+                // Disable background tracking
+                this.disableBackgroundTracking();
+                
+                console.log('GPS tracking stopped');
+            }
+
+            async endTrip() {
+                try {
+                    // Show location status
+                    const locationStatus = document.getElementById('locationStatus');
+                    locationStatus.classList.remove('hidden');
+                    locationStatus.textContent = '📍 Getting final location...';
+
+                    // Get current location
+                    const location = this.currentLocation || await this.getCurrentLocation();
+
+                    const headers = { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`
+                    };
+
+                    // End trip with accumulated GPS distance
+                    const response = await fetch('/api/trip/end', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({
+                            latitude: location.latitude,
+                            longitude: location.longitude,
+                            gpsDistance: this.totalGpsDistance || 0
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        // Stop location watching and real-time updates
+                        this.stopLocationWatch();
+                        this.stopLiveDistanceUpdates();
+
+                        // Destroy trip map
+                        this.destroyTripMap();
+
+                        // Update display
+                        this.updateOdometerDisplay(result.trip.endOdometer);
+                        
+                        // Show setup form again
+                        document.getElementById('activeTripDisplay').classList.add('hidden');
+                        document.getElementById('setupForm').classList.remove('hidden');
+                        document.getElementById('tripStatus').textContent = 'No Active Trip';
+                        document.getElementById('tripStatus').classList.add('inactive');
+
+                        // Update odometer field with new value
+                        document.getElementById('currentOdometer').value = this.roundDistance(parseFloat(result.trip.endOdometer));
+                        
+                        // Clear purpose field for next trip
+                        document.getElementById('tripPurpose').value = '';
+
+                        // Show success message
+                        this.showMessage(result.message, 'success');
+                        locationStatus.classList.add('hidden');
+
+                        // Refresh trip history
+                        await this.loadTripHistory();
+
+                    } else {
+                        throw new Error(result.error || 'Failed to end trip');
+                    }
+
+                } catch (error) {
+                    console.error('Error ending trip:', error);
+                    document.getElementById('locationStatus').classList.add('hidden');
+                    this.showMessage('Error ending trip: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // Global variable for trip app instance
+        let tripApp;
+
+        // Register Service Worker for background functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker registered successfully:', registration.scope);
+                        
+                        // Listen for updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('New service worker available');
+                                }
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // Initialize the app when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            tripApp = new TripGoApp();
+        });
+
+        // Handle background operation - keep the app running even when minimized
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('App is running in background');
+            } else {
+                console.log('App is back in foreground');
+                // Refresh data when coming back to foreground
+                if (tripApp && tripApp.token) {
+                    tripApp.loadAppData();
+                    tripApp.loadTripHistory();
+                }
+            }
+        });
+
+        // Prevent zoom on double tap for iOS
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
+        // Handle viewport changes for mobile keyboards
+        function handleViewportChange() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+
+        window.addEventListener('resize', handleViewportChange);
+        window.addEventListener('orientationchange', handleViewportChange);
+        handleViewportChange();
+
+        // Add touch feedback for better mobile experience
+        document.addEventListener('touchstart', function(e) {
+            if (e.target.matches('.btn, .btn-small, .tab-btn, .trip-card')) {
+                e.target.style.opacity = '0.8';
+            }
+        });
+
+        document.addEventListener('touchend', function(e) {
+            if (e.target.matches('.btn, .btn-small, .tab-btn, .trip-card')) {
+                setTimeout(() => {
+                    e.target.style.opacity = '';
+                }, 150);
+            }
+        });
+    </script>
+</body>
+</html>

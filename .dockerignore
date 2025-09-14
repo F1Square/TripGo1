@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+.git
+.gitignore
+.env
+*.md
+.nyc_output
+coverage
+.DS_Store
+*.log
+users.json
+trips.json
+Motor_Vehicle_Log.csv
