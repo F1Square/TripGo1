@@ -117,6 +117,28 @@ async function updateUserData(userId, data) {
     }
 }
 
+// Helper function to calculate seconds until next 1 AM for JWT expiration
+function getSecondsUntilNext1AM() {
+    const now = new Date();
+    const next1AM = new Date();
+    
+    // Set to 1 AM today
+    next1AM.setHours(1, 0, 0, 0);
+    
+    // If current time is already past 1 AM today, set to 1 AM tomorrow
+    if (now >= next1AM) {
+        next1AM.setDate(next1AM.getDate() + 1);
+    }
+    
+    // Calculate difference in seconds
+    const diffMs = next1AM.getTime() - now.getTime();
+    const diffSeconds = Math.floor(diffMs / 1000);
+    
+    console.log(`Token will expire at: ${next1AM.toLocaleString()}, in ${Math.floor(diffSeconds / 3600)} hours and ${Math.floor((diffSeconds % 3600) / 60)} minutes`);
+    
+    return diffSeconds;
+}
+
 // Helper function to calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Radius of the Earth in km
@@ -390,11 +412,12 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password. Please check your credentials.' });
         }
 
-        // Generate JWT token
+        // Generate JWT token that expires at 1 AM every night
+        const secondsUntil1AM = getSecondsUntilNext1AM();
         const token = jwt.sign(
             { userId: emailKey, username: user.fullName },
             JWT_SECRET,
-            { expiresIn: '24h' }
+            { expiresIn: secondsUntil1AM }
         );
 
         req.session.token = token;
