@@ -548,7 +548,7 @@ app.post('/api/trip/start', authenticateToken, async (req, res) => {
 // End current trip
 app.post('/api/trip/end', authenticateToken, async (req, res) => {
     try {
-        const { latitude, longitude, gpsDistance } = req.body;
+        const { latitude, longitude, gpsDistance, actualTravelledDistance, userProvidedEndOdometer } = req.body;
         
         if (!latitude || !longitude) {
             return res.status(400).json({ error: 'Location coordinates are required' });
@@ -570,23 +570,31 @@ app.post('/api/trip/end', authenticateToken, async (req, res) => {
             longitude
         );
         
-        // Prioritize GPS tracking distance for route-based calculation
-        let actualDistance;
+        // Determine the distance to use based on user input
+        let finalDistance;
+        let distanceSource;
         
-        // Use GPS distance if available and reasonable (prioritize actual route traveled)
-        if (gpsDistance && gpsDistance > 0.01) {  // Accept any GPS distance above 10 meters
-            actualDistance = gpsDistance;
-            console.log('Using GPS route distance:', gpsDistance, 'km');
+        if (userProvidedEndOdometer !== null && userProvidedEndOdometer !== undefined) {
+            // User provided end odometer reading - calculate distance from odometer difference
+            finalDistance = actualTravelledDistance;
+            distanceSource = 'odometer reading';
+            console.log('Using user-provided odometer reading. Distance:', finalDistance, 'km');
+        } else if (gpsDistance && gpsDistance > 0.01) {
+            // Use GPS distance if available and reasonable
+            finalDistance = gpsDistance;
+            distanceSource = 'GPS tracking';
+            console.log('Using GPS route distance:', finalDistance, 'km');
         } else {
-            // Only fall back to straight-line if GPS tracking completely failed
-            actualDistance = straightLineDistance;
-            console.log('GPS tracking failed, using straight-line distance:', straightLineDistance, 'km');
+            // Fall back to straight-line distance
+            finalDistance = straightLineDistance;
+            distanceSource = 'straight-line calculation';
+            console.log('GPS tracking failed, using straight-line distance:', finalDistance, 'km');
         }
         
         // Apply custom rounding logic to the final distance
-        const roundedDistance = roundDistance(actualDistance);
+        const roundedDistance = roundDistance(finalDistance);
         
-        console.log('Trip End - GPS Tracking Distance:', gpsDistance, 'km, Straight-line Distance:', straightLineDistance, 'km, Using:', actualDistance, 'km, Rounded:', roundedDistance, 'km');
+        console.log('Trip End - GPS Distance:', gpsDistance, 'km, Straight-line Distance:', straightLineDistance, 'km, Using:', finalDistance, 'km (', distanceSource, '), Rounded:', roundedDistance, 'km');
         console.log('Trip coordinates - Start:', trip.startLatitude, trip.startLongitude, 'End:', latitude, longitude);
         
         const user = await User.findOne({ email: req.userId });
@@ -594,6 +602,18 @@ app.post('/api/trip/end', authenticateToken, async (req, res) => {
         // Get both start and end area from coordinates to ensure they're included
         const startArea = trip.startArea || await getAreaFromCoordinates(trip.startLatitude, trip.startLongitude);
         const endArea = await getAreaFromCoordinates(latitude, longitude);
+        
+        // Calculate end odometer based on user input or GPS distance
+        let newEndOdometer;
+        if (userProvidedEndOdometer !== null && userProvidedEndOdometer !== undefined) {
+            // User provided end odometer reading - use that as the new odometer value
+            newEndOdometer = roundDistance(userProvidedEndOdometer);
+            console.log('Using user-provided end odometer:', newEndOdometer, 'km');
+        } else {
+            // Use current odometer + calculated distance
+            newEndOdometer = roundDistance(userData.currentOdometer + roundedDistance);
+            console.log('Calculated end odometer from distance:', newEndOdometer, 'km');
+        }
         
         const completedTrip = {
             ...trip,
@@ -603,9 +623,10 @@ app.post('/api/trip/end', authenticateToken, async (req, res) => {
             startArea: startArea,
             endArea: endArea,
             endTime: new Date().toISOString(),
-            gpsDistance: roundedDistance,
-            endOdometer: roundDistance(userData.currentOdometer + roundedDistance),
+            gpsDistance: gpsDistance || 0, // Store original GPS distance for reference
+            endOdometer: newEndOdometer,
             totalDistance: roundedDistance,
+            distanceSource: distanceSource, // Store how distance was calculated
             routePoints: trip.routePoints || [],
             active: false
         };
@@ -615,7 +636,7 @@ app.post('/api/trip/end', authenticateToken, async (req, res) => {
         await tripDoc.save();
         
         // Update current odometer and remove active trip
-        userData.currentOdometer = roundDistance(userData.currentOdometer + roundedDistance);
+        userData.currentOdometer = newEndOdometer;
         userData.activeTrip = null;
         await userData.save();
         
@@ -667,7 +688,7 @@ app.post('/api/trip/end', authenticateToken, async (req, res) => {
         res.json({ 
             success: true, 
             trip: completedTrip,
-             message: `Your trip ended successfully! Current odometer: ${Math.round(completedTrip.endOdometer)} km`
+            message: `Trip ended successfully! Distance: ${roundedDistance}km (${distanceSource}). Current odometer: ${Math.round(completedTrip.endOdometer)}km`
         });
     } catch (error) {
         console.error('Error ending trip:', error);

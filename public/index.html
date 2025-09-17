@@ -1041,6 +1041,147 @@
                 scroll-behavior: auto !important;
             }
         }
+
+        /* End Trip Modal Styles */
+        .end-trip-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        .end-trip-modal.active {
+            opacity: 1 !important;
+            visibility: visible !important;
+            display: flex !important;
+        }
+
+        .end-trip-content {
+            background: white;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 450px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+        }
+
+        .end-trip-modal.active .end-trip-content {
+            transform: scale(1);
+        }
+
+        .end-trip-header {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 20px;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+        }
+
+        .end-trip-title {
+            margin: 0;
+            font-size: clamp(1.2rem, 4vw, 1.4rem);
+            font-weight: bold;
+        }
+
+        .end-trip-body {
+            padding: 25px;
+        }
+
+        .trip-summary {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 2px solid #e1e5e9;
+        }
+
+        .trip-summary h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: clamp(1rem, 3vw, 1.1rem);
+        }
+
+        .distance-value {
+            font-size: clamp(1.5rem, 5vw, 2rem);
+            font-weight: bold;
+            color: #28a745;
+            margin: 10px 0;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .modal-actions .btn {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            color: white;
+        }
+
+        .btn-secondary:hover, .btn-secondary:active {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(108, 117, 125, 0.3);
+        }
+
+        /* Mobile responsiveness for end trip modal */
+        @media (max-width: 768px) {
+            .end-trip-content {
+                width: 95%;
+                margin: 10px;
+                max-height: 85vh;
+            }
+
+            .end-trip-body {
+                padding: 20px;
+            }
+
+            .modal-actions {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .modal-actions .btn {
+                width: 100%;
+            }
+        }
+
+        /* Very small screens */
+        @media (max-width: 480px) {
+            .end-trip-header {
+                padding: 15px;
+            }
+
+            .end-trip-body {
+                padding: 15px;
+            }
+
+            .trip-summary {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1345,16 +1486,52 @@
         </div>
     </div>
 
+    <!-- End Trip Confirmation Modal -->
+    <div id="endTripModal" class="end-trip-modal">
+        <div class="end-trip-content">
+            <div class="end-trip-header">
+                <h3 class="end-trip-title">🏁 End Trip Confirmation</h3>
+            </div>
+            <div class="end-trip-body">
+                <div class="trip-summary">
+                    <h4>GPS Calculated Distance</h4>
+                    <div class="distance-value" id="modalGpsDistance">0 km</div>
+                    <p>Distance measured by GPS tracking</p>
+                </div>
+                
+                <div class="trip-summary" style="background: #e3f2fd; border: 1px solid #2196f3;">
+                    <h4 style="color: #1976d2;">Current Odometer Reading</h4>
+                    <div class="distance-value" id="modalCurrentOdometer" style="color: #1976d2;">0 km</div>
+                    <p>Your current odometer reading for reference</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="endOdometerInput">End Odometer Reading (Optional)</label>
+                    <input type="number" 
+                           id="endOdometerInput" 
+                           placeholder="Enter end odometer reading in km"
+                           step="0.1"
+                           min="0">
+                    <div id="odometerError" style="color: #dc3545; font-size: 0.9em; margin-top: 5px; display: none;">
+                        End odometer reading cannot be less than current odometer reading!
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="cancelEndTrip">Cancel</button>
+                    <button class="btn btn-primary" id="confirmEndTrip">End Trip</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         class TripGoApp {
             constructor() {
-                // Core app state
                 this.currentLocation = null;
                 this.watchId = null;
                 this.token = localStorage.getItem('tripgo_token');
                 this.currentUser = null;
-                
-                // Map related properties
                 this.tripMap = null;
                 this.routePolyline = null;
                 this.currentMarker = null;
@@ -1365,33 +1542,6 @@
                     satellite: null,
                     currentLayer: 'street'
                 };
-                
-                // Enhanced GPS tracking properties
-                this.totalGpsDistance = 0;
-                this.lastKnownPosition = null;
-                this.gpsPoints = [];
-                this.lastValidTime = Date.now();
-                this.gpsUpdateCount = 0;
-                this.tripStartTime = null;
-                this.activeTrip = null;
-                
-                // Route point management
-                this.lastRoutePointSent = null;
-                this.failedRoutePoints = [];
-                this.previousLocations = [];
-                this.routePointQueue = [];
-                
-                // Background tracking
-                this.backgroundSyncInterval = null;
-                this.wakeLock = null;
-                this.backupGpsInterval = null;
-                this.liveUpdateInterval = null;
-                this.isBackgroundMode = false;
-                
-                // State persistence
-                this.stateVersion = '2.0';
-                this.lastStateSync = Date.now();
-                
                 this.init();
             }
 
@@ -1432,6 +1582,8 @@
                     this.setupEventListeners();
                     this.setTodayDate();
                     this.setDateRestrictions();
+                    
+
                     
                 } catch (error) {
                     console.error('Error initializing app:', error);
@@ -1616,7 +1768,10 @@
                 
                 // App event listeners
                 document.getElementById('startTripBtn').addEventListener('click', () => this.startTrip());
-                document.getElementById('endTripBtn').addEventListener('click', () => this.endTrip());
+                document.getElementById('endTripBtn').addEventListener('click', () => {
+                    console.log('End trip button clicked');
+                    this.endTrip();
+                });
                 document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
                 document.getElementById('exportCsvBtn').addEventListener('click', () => this.exportToCSV());
                 
@@ -1688,6 +1843,30 @@
                 });
                 document.getElementById('loginPassword').addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') this.login();
+                });
+
+                // End trip modal listeners
+                document.getElementById('confirmEndTrip').addEventListener('click', () => this.confirmEndTrip());
+                document.getElementById('cancelEndTrip').addEventListener('click', () => this.hideEndTripModal());
+                
+                // Close end trip modal when clicking outside
+                document.getElementById('endTripModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'endTripModal') {
+                        this.hideEndTripModal();
+                    }
+                });
+                
+                // Keyboard shortcuts for end trip modal
+                document.addEventListener('keydown', (e) => {
+                    const modal = document.getElementById('endTripModal');
+                    if (modal.classList.contains('active')) {
+                        if (e.key === 'Escape') {
+                            this.hideEndTripModal();
+                        } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            this.confirmEndTrip();
+                        }
+                    }
                 });
             }
 
@@ -1989,46 +2168,20 @@
                 document.getElementById('activeStartOdometer').textContent = Math.round(parseFloat(trip.startOdometer));
                 document.getElementById('activeStartTime').textContent = new Date(trip.startTime).toLocaleTimeString();
                 
-                // Store active trip reference
-                this.activeTrip = trip;
-                
-                // Initialize real-time tracking variables - improved distance calculation
-                this.totalGpsDistance = trip.gpsDistance || 0; // Resume from stored GPS distance
+                // Initialize real-time tracking variables
+                this.totalGpsDistance = 0;
                 this.tripStartTime = new Date(trip.startTime);
-                
-                // Calculate route-based distance if route points exist
-                if (trip.routePoints && trip.routePoints.length > 1) {
-                    const routeDistance = this.calculateRouteDistance(trip.routePoints);
-                    console.log(`Route-based distance: ${routeDistance.toFixed(3)}km, GPS distance: ${this.totalGpsDistance.toFixed(3)}km`);
-                    
-                    // Use route distance if significantly different from GPS distance (indicating gaps)
-                    if (Math.abs(routeDistance - this.totalGpsDistance) > 0.5) {
-                        console.log('Using route-based distance due to significant difference');
-                        this.totalGpsDistance = routeDistance;
-                    }
-                }
                 
                 // Initialize map with trip start location
                 if (trip.startLatitude && trip.startLongitude) {
                     setTimeout(() => {
                         this.initializeTripMap(trip.startLatitude, trip.startLongitude);
-                        
-                        // Load existing route points if available
-                        if (trip.routePoints && trip.routePoints.length > 0) {
-                            this.loadExistingRoute(trip.routePoints);
-                        }
                     }, 100); // Small delay to ensure DOM is ready
                 }
                 
                 // Start real-time distance updates
                 this.updateLiveDistance();
                 this.startLiveDistanceUpdates();
-                
-                // Start periodic state persistence
-                this.startPeriodicStateSync();
-                
-                // Retry any failed route points
-                this.retryFailedRoutePoints();
             }
 
             showMessage(message, type) {
@@ -2052,6 +2205,49 @@
             isValidEmail(email) {
                 const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
                 return emailRegex.test(email);
+            }
+
+            // End odometer validation function
+            validateEndOdometer(event, currentOdometerReading) {
+                const input = event.target;
+                const errorElement = document.getElementById('odometerError');
+                const confirmButton = document.getElementById('confirmEndTrip');
+                const inputValue = parseFloat(input.value);
+                
+                if (input.value && !isNaN(inputValue)) {
+                    if (inputValue < currentOdometerReading) {
+                        // Show error
+                        if (errorElement) {
+                            errorElement.style.display = 'block';
+                            errorElement.textContent = `End odometer reading (${inputValue}km) cannot be less than current odometer reading (${currentOdometerReading}km)!`;
+                        }
+                        input.style.borderColor = '#dc3545';
+                        if (confirmButton) {
+                            confirmButton.disabled = true;
+                            confirmButton.style.opacity = '0.6';
+                        }
+                    } else {
+                        // Hide error
+                        if (errorElement) {
+                            errorElement.style.display = 'none';
+                        }
+                        input.style.borderColor = '#28a745';
+                        if (confirmButton) {
+                            confirmButton.disabled = false;
+                            confirmButton.style.opacity = '1';
+                        }
+                    }
+                } else {
+                    // Empty or invalid input - reset to default state
+                    if (errorElement) {
+                        errorElement.style.display = 'none';
+                    }
+                    input.style.borderColor = '#e1e5e9';
+                    if (confirmButton) {
+                        confirmButton.disabled = false;
+                        confirmButton.style.opacity = '1';
+                    }
+                }
             }
 
             async getCurrentLocation() {
@@ -3347,76 +3543,57 @@
                 }
             }
 
-            // Enhanced GPS point validation for real-world tracking with power-off resilience
+            // Enhanced GPS point validation for real-world tracking
             isValidGPSPoint(distance, timeDiff, currentAccuracy, lastAccuracy) {
                 // Accept point if no previous position
                 if (!this.lastKnownPosition) return true;
                 
-                // More permissive validation for real-world scenarios including power-off recovery
+                // Improved validation for real-world mobile GPS tracking
                 
-                // Allow faster updates for better route tracking
-                if (timeDiff < 0.5) return false;
+                // Minimum time between updates (prevent rapid-fire updates)
+                if (timeDiff < 1) return false;
                 
-                // More generous accuracy threshold for mobile devices
-                let accuracyThreshold = 150; // Start with 150m for typical mobile GPS
+                // Dynamic accuracy threshold based on device capabilities
+                let accuracyThreshold = 100; // Start with 100m for good GPS
                 
                 // Adjust accuracy threshold based on current GPS quality
-                if (currentAccuracy > 30) {
-                    accuracyThreshold = Math.min(currentAccuracy * 2.5, 500); // Allow 2.5x current accuracy, max 500m
+                if (currentAccuracy > 50) {
+                    accuracyThreshold = Math.min(currentAccuracy * 2, 300); // Allow 2x current accuracy, max 300m
                 }
                 
-                // Be very lenient if we haven't had a valid GPS point in a while (power-off scenario)
+                // If we haven't had a valid GPS point in a while, be more lenient
                 const timeSinceLastValid = (Date.now() - this.lastValidTime) / 1000;
-                if (timeSinceLastValid > 60) {
-                    // After 1 minute without valid GPS, be very permissive for recovery
-                    accuracyThreshold = Math.min(accuracyThreshold * 5, 1000); // Up to 1km for recovery
-                    console.log(`GPS Recovery Mode: Extended accuracy threshold to ${accuracyThreshold}m after ${Math.round(timeSinceLastValid)}s gap`);
+                if (timeSinceLastValid > 30) {
+                    accuracyThreshold = Math.min(accuracyThreshold * 2, 500);
                 }
                 
                 // Calculate speed for validation
-                const calculatedSpeed = (distance / timeDiff) * 3.6; // convert to km/h
+                const calculatedSpeed = (distance / timeDiff) * 3.6; // m/s to km/h
                 
-                // More generous speed limits for various scenarios
-                let maxSpeedKmh = 250; // Allow high speeds for highways
-                
-                // For long time gaps (like power-off), allow even higher "speeds" as it's likely accumulated distance
-                if (timeDiff > 300) { // 5+ minutes gap
-                    maxSpeedKmh = 500; // Very generous for power-off scenarios
-                    console.log(`Long gap detected (${Math.round(timeDiff)}s), using generous speed limit: ${maxSpeedKmh}km/h`);
-                }
-                
+                // Reasonable speed validation for vehicles (allow up to 200 km/h for highways)
+                const maxSpeedKmh = 200;
                 const withinSpeedLimit = calculatedSpeed <= maxSpeedKmh;
                 
-                // More generous distance validation
-                const maxDistance = Math.max(0.2, (maxSpeedKmh / 3.6) * timeDiff); // Allow theoretical max distance at speed limit
+                // Distance validation - filter out obvious GPS jumps
+                const maxDistance = Math.max(0.1, (calculatedSpeed / 3.6) * timeDiff * 2); // Allow 2x expected distance
                 const reasonableDistance = distance <= maxDistance;
                 
                 // Accuracy validation
                 const withinAccuracy = currentAccuracy <= accuracyThreshold;
                 
-                // Lower minimum movement threshold for better route capture
-                const minMovement = currentAccuracy > 50 ? 0.002 : 0.001; // 2m or 1m depending on accuracy
+                // Minimum movement threshold (ignore tiny movements that could be GPS drift)
+                const minMovement = currentAccuracy > 20 ? 0.005 : 0.002; // 5m or 2m depending on accuracy
                 const sufficientMovement = distance >= minMovement;
                 
-                // Special handling for significant gaps (power-off scenarios)
-                if (timeDiff > 120 && distance > 0.1) {
-                    // For gaps over 2 minutes with significant movement, be more lenient
-                    const isReasonableForGap = distance <= (timeDiff / 60) * 10; // Max 10km per minute gap
-                    if (isReasonableForGap) {
-                        console.log(`Power-off recovery: Accepting ${distance.toFixed(2)}km over ${Math.round(timeDiff)}s gap`);
-                        return true; // Accept reasonable distance for long gaps
-                    }
-                }
-                
-                // Accept point if it passes most checks (more permissive)
-                const validPoint = (withinAccuracy || timeDiff > 60) && withinSpeedLimit && reasonableDistance && sufficientMovement;
+                // Accept point if it passes all checks
+                const validPoint = withinAccuracy && withinSpeedLimit && reasonableDistance && sufficientMovement;
                 
                 // Enhanced logging for debugging GPS tracking
                 if (distance > 0.001) { // Only log significant movements
-                    console.log(`GPS Analysis: dist=${distance.toFixed(4)}km, time=${Math.round(timeDiff)}s, speed=${calculatedSpeed.toFixed(1)}km/h, acc=${Math.round(currentAccuracy)}m`);
+                    console.log(`GPS Analysis: dist=${distance.toFixed(4)}km, time=${timeDiff}s, speed=${calculatedSpeed.toFixed(1)}km/h, acc=${currentAccuracy}m`);
                     
                     if (!validPoint) {
-                        console.log(`GPS REJECTED - acc:${withinAccuracy}(${Math.round(currentAccuracy)}<=${accuracyThreshold}), speed:${withinSpeedLimit}(${calculatedSpeed.toFixed(1)}<=${maxSpeedKmh}), dist:${reasonableDistance}(${distance.toFixed(4)}<=${maxDistance.toFixed(4)}), move:${sufficientMovement}(${distance.toFixed(4)}>=${minMovement})`);
+                        console.log(`GPS REJECTED - acc:${withinAccuracy}(${currentAccuracy}<=${accuracyThreshold}), speed:${withinSpeedLimit}(${calculatedSpeed.toFixed(1)}<=${maxSpeedKmh}), dist:${reasonableDistance}(${distance.toFixed(4)}<=${maxDistance.toFixed(4)}), move:${sufficientMovement}(${distance.toFixed(4)}>=${minMovement})`);
                     }
                 }
                 
@@ -3424,14 +3601,11 @@
             }
 
             sendRoutePointToServer(location) {
-                // More frequent route point storage for better route tracking
-                // Send route points every 15 seconds or every 50 meters for detailed routes
+                // Send route points every 30 seconds or every 100 meters to avoid overwhelming server
                 const now = Date.now();
                 
                 if (!this.lastRoutePointSent) {
                     this.lastRoutePointSent = { time: now, location: location };
-                    // Always send first point
-                    this.sendRoutePoint(location.latitude, location.longitude, location.accuracy);
                     return;
                 }
                 
@@ -3443,139 +3617,29 @@
                     location.longitude
                 );
                 
-                // More frequent sending: every 15 seconds OR every 50 meters for better route capture
-                let shouldSend = timeSinceLastSent >= 15 || distanceSinceLastSent >= 0.05;
-                
-                // Force send if it's been over 60 seconds regardless of distance
-                if (timeSinceLastSent >= 60) {
-                    shouldSend = true;
-                    console.log(`Force sending route point after ${Math.round(timeSinceLastSent)}s`);
-                }
-                
-                // Also send on significant direction changes (better for turns and curves)
-                if (this.detectDirectionChange(location)) {
-                    shouldSend = true;
-                    console.log('Direction change detected, sending route point');
-                }
-                
-                if (shouldSend) {
-                    this.sendRoutePoint(location.latitude, location.longitude, location.accuracy);
-                    this.lastRoutePointSent = { time: now, location: location };
-                }
-            }
-            
-            async sendRoutePoint(latitude, longitude, accuracy = null) {
-                try {
-                    await fetch('/api/trip/route', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${this.token}`
-                        },
-                        body: JSON.stringify({
-                            latitude: latitude,
-                            longitude: longitude,
-                            accuracy: accuracy || 0
-                        })
-                    });
-                    console.log(`Route point sent: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-                } catch (error) {
-                    console.warn('Failed to send route point:', error);
-                    
-                    // Store failed points locally for retry
-                    this.storeFailedRoutePoint(latitude, longitude, accuracy);
-                }
-            }
-            
-            storeFailedRoutePoint(latitude, longitude, accuracy) {
-                try {
-                    if (!this.failedRoutePoints) {
-                        this.failedRoutePoints = [];
-                    }
-                    
-                    this.failedRoutePoints.push({
-                        latitude,
-                        longitude,
-                        accuracy: accuracy || 0,
-                        timestamp: Date.now()
-                    });
-                    
-                    // Limit stored failed points to prevent memory issues
-                    if (this.failedRoutePoints.length > 100) {
-                        this.failedRoutePoints = this.failedRoutePoints.slice(-50);
-                    }
-                    
-                    console.log(`Stored failed route point locally: ${this.failedRoutePoints.length} pending`);
-                } catch (error) {
-                    console.error('Failed to store route point locally:', error);
-                }
-            }
-            
-            async retryFailedRoutePoints() {
-                if (!this.failedRoutePoints || this.failedRoutePoints.length === 0) {
-                    return;
-                }
-                
-                console.log(`Retrying ${this.failedRoutePoints.length} failed route points...`);
-                const pointsToRetry = [...this.failedRoutePoints];
-                this.failedRoutePoints = [];
-                
-                for (const point of pointsToRetry) {
+                // Send if 30 seconds have passed OR if moved more than 100 meters
+                if (timeSinceLastSent >= 30 || distanceSinceLastSent >= 0.1) {
                     try {
-                        await this.sendRoutePoint(point.latitude, point.longitude, point.accuracy);
-                        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay between retries
+                        fetch('/api/trip/route', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.token}`
+                            },
+                            body: JSON.stringify({
+                                latitude: location.latitude,
+                                longitude: location.longitude,
+                                accuracy: location.accuracy
+                            })
+                        }).catch(error => {
+                            console.warn('Failed to send route point:', error);
+                        });
+                        
+                        this.lastRoutePointSent = { time: now, location: location };
                     } catch (error) {
-                        // Re-add failed point for later retry
-                        this.storeFailedRoutePoint(point.latitude, point.longitude, point.accuracy);
+                        console.warn('Error sending route point:', error);
                     }
                 }
-            }
-            
-            detectDirectionChange(newLocation) {
-                if (!this.previousLocations) {
-                    this.previousLocations = [];
-                }
-                
-                this.previousLocations.push(newLocation);
-                
-                // Keep only last 3 points for direction analysis
-                if (this.previousLocations.length > 3) {
-                    this.previousLocations.shift();
-                }
-                
-                // Need at least 3 points to detect direction change
-                if (this.previousLocations.length < 3) {
-                    return false;
-                }
-                
-                const [p1, p2, p3] = this.previousLocations;
-                
-                // Calculate bearings
-                const bearing1 = this.calculateBearing(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
-                const bearing2 = this.calculateBearing(p2.latitude, p2.longitude, p3.latitude, p3.longitude);
-                
-                // Calculate angle difference
-                let angleDiff = Math.abs(bearing2 - bearing1);
-                if (angleDiff > 180) {
-                    angleDiff = 360 - angleDiff;
-                }
-                
-                // Consider it a direction change if angle difference is > 30 degrees
-                return angleDiff > 30;
-            }
-            
-            calculateBearing(lat1, lng1, lat2, lng2) {
-                const dLng = this.toRadians(lng2 - lng1);
-                const lat1Rad = this.toRadians(lat1);
-                const lat2Rad = this.toRadians(lat2);
-                
-                const y = Math.sin(dLng) * Math.cos(lat2Rad);
-                const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
-                
-                let bearing = Math.atan2(y, x);
-                bearing = (bearing * 180 / Math.PI + 360) % 360; // Convert to degrees and normalize
-                
-                return bearing;
             }
 
             updateLiveDistance() {
@@ -3698,8 +3762,129 @@
                 console.log('GPS tracking stopped');
             }
 
+            showEndTripModal() {
+                console.log('showEndTripModal called');
+                
+                // Show the end trip modal with current GPS distance
+                const modal = document.getElementById('endTripModal');
+                const gpsDistanceElement = document.getElementById('modalGpsDistance');
+                const endOdometerInput = document.getElementById('endOdometerInput');
+                
+                if (!modal) {
+                    console.error('End trip modal not found in DOM!');
+                    console.error('Available elements with "modal" in ID:', Array.from(document.querySelectorAll('[id*="modal"]')).map(el => el.id));
+                    return;
+                }
+                
+                if (!gpsDistanceElement) {
+                    console.error('Modal GPS distance element not found!');
+                    console.error('Available elements with "modalGps" in ID:', Array.from(document.querySelectorAll('[id*="modalGps"]')).map(el => el.id));
+                    return;
+                }
+                
+                // Display the current GPS calculated distance
+                const gpsDistance = this.totalGpsDistance || 0;
+                gpsDistanceElement.textContent = `${gpsDistance.toFixed(2)} km`;
+                console.log('Set GPS distance to:', gpsDistance.toFixed(2), 'km');
+                
+                // Display current odometer reading
+                const currentOdometerElement = document.getElementById('modalCurrentOdometer');
+                const currentOdometerReading = parseFloat(document.getElementById('currentOdometer').value) || 0;
+                if (currentOdometerElement) {
+                    currentOdometerElement.textContent = `${currentOdometerReading.toFixed(2)} km`;
+                    console.log('Set current odometer to:', currentOdometerReading.toFixed(2), 'km');
+                }
+                
+                // Clear the end odometer input and set up validation
+                if (endOdometerInput) {
+                    endOdometerInput.value = '';
+                    endOdometerInput.min = currentOdometerReading; // Set minimum to current odometer
+                    
+                    // Remove any existing event listeners to avoid duplicates
+                    endOdometerInput.removeEventListener('input', this.validateEndOdometer);
+                    endOdometerInput.removeEventListener('blur', this.validateEndOdometer);
+                    
+                    // Add validation event listeners
+                    endOdometerInput.addEventListener('input', (e) => this.validateEndOdometer(e, currentOdometerReading));
+                    endOdometerInput.addEventListener('blur', (e) => this.validateEndOdometer(e, currentOdometerReading));
+                    
+                    console.log('Cleared end odometer input and set minimum to:', currentOdometerReading);
+                } else {
+                    console.warn('End odometer input not found');
+                }
+                
+                // Force show modal with inline styles to override any CSS issues
+                modal.classList.add('active');
+                modal.style.display = 'flex !important';
+                modal.style.opacity = '1 !important';
+                modal.style.visibility = 'visible !important';
+                modal.style.zIndex = '10000';
+                modal.style.position = 'fixed';
+                modal.style.top = '0';
+                modal.style.left = '0';
+                modal.style.width = '100%';
+                modal.style.height = '100%';
+                document.body.style.overflow = 'hidden';
+                
+                console.log('Modal classes after showing:', modal.className);
+                console.log('Modal style after showing:', modal.style.cssText);
+                console.log('Modal should now be visible with GPS distance:', gpsDistance.toFixed(2), 'km');
+                
+                // Double check if modal is visible
+                setTimeout(() => {
+                    const computedStyle = window.getComputedStyle(modal);
+                    console.log('Modal computed visibility:', computedStyle.visibility);
+                    console.log('Modal computed opacity:', computedStyle.opacity);
+                    console.log('Modal computed display:', computedStyle.display);
+                }, 100);
+            }
+
+            hideEndTripModal() {
+                const modal = document.getElementById('endTripModal');
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+
             async endTrip() {
+                console.log('End trip function called - showing modal');
+                
                 try {
+                    this.showEndTripModal();
+                    console.log('showEndTripModal called successfully');
+                } catch (error) {
+                    console.error('Error showing end trip modal:', error);
+                    // Fallback: show a simple confirmation
+                    if (confirm('End trip? This will calculate the distance and update your odometer.')) {
+                        this.confirmEndTrip();
+                    }
+                }
+            }
+
+            async confirmEndTrip() {
+                try {
+                    // Get the end odometer value if provided and validate it first
+                    const endOdometerInput = document.getElementById('endOdometerInput');
+                    const endOdometerValue = endOdometerInput ? endOdometerInput.value.trim() : '';
+                    const currentOdometerReading = parseFloat(document.getElementById('currentOdometer').value) || 0;
+                    
+                    // Validate end odometer if provided
+                    if (endOdometerValue && !isNaN(parseFloat(endOdometerValue))) {
+                        const endOdometerFloat = parseFloat(endOdometerValue);
+                        if (endOdometerFloat < currentOdometerReading) {
+                            // Show error and don't proceed
+                            const errorElement = document.getElementById('odometerError');
+                            if (errorElement) {
+                                errorElement.style.display = 'block';
+                                errorElement.textContent = `End odometer reading (${endOdometerFloat}km) cannot be less than current odometer reading (${currentOdometerReading}km)!`;
+                            }
+                            this.showMessage(`Invalid end odometer reading. End odometer (${endOdometerFloat}km) cannot be less than current odometer (${currentOdometerReading}km).`, 'error');
+                            return; // Don't proceed with ending the trip
+                        }
+                    }
+                    
+                    // Hide the modal first
+                    this.hideEndTripModal();
+
                     // Show location status
                     const locationStatus = document.getElementById('locationStatus');
                     locationStatus.classList.remove('hidden');
@@ -3713,15 +3898,38 @@
                         'Authorization': `Bearer ${this.token}`
                     };
 
+                    // Calculate the actual travelled distance based on user input or GPS
+                    const gpsDistance = this.totalGpsDistance || 0;
+                    let actualTravelledDistance = gpsDistance;
+
+                    // If user provided end odometer reading, calculate distance from that
+                    if (endOdometerValue && !isNaN(parseFloat(endOdometerValue))) {
+                        const currentOdometerReading = parseFloat(document.getElementById('currentOdometer').value) || 0;
+                        const endOdometerReading = parseFloat(endOdometerValue);
+                        
+                        // Calculate travelled distance from odometer readings
+                        actualTravelledDistance = endOdometerReading - currentOdometerReading;
+                        
+                        console.log(`User provided end odometer: ${endOdometerReading}km`);
+                        console.log(`Current odometer: ${currentOdometerReading}km`);
+                        console.log(`Calculated distance from odometer: ${actualTravelledDistance}km`);
+                        console.log(`GPS calculated distance: ${gpsDistance}km`);
+                    }
+
+                    // Prepare request body
+                    const requestBody = {
+                        latitude: location.latitude,
+                        longitude: location.longitude,
+                        gpsDistance: gpsDistance,
+                        actualTravelledDistance: actualTravelledDistance,
+                        userProvidedEndOdometer: endOdometerValue && !isNaN(parseFloat(endOdometerValue)) ? parseFloat(endOdometerValue) : null
+                    };
+
                     // End trip with accumulated GPS distance
                     const response = await fetch('/api/trip/end', {
                         method: 'POST',
                         headers,
-                        body: JSON.stringify({
-                            latitude: location.latitude,
-                            longitude: location.longitude,
-                            gpsDistance: this.totalGpsDistance || 0
-                        })
+                        body: JSON.stringify(requestBody)
                     });
 
                     const result = await response.json();
@@ -3730,13 +3938,9 @@
                         // Stop location watching and real-time updates
                         this.stopLocationWatch();
                         this.stopLiveDistanceUpdates();
-                        this.stopPeriodicStateSync();
 
                         // Destroy trip map
                         this.destroyTripMap();
-                        
-                        // Clean up background state
-                        localStorage.removeItem('tripgo_background_state');
 
                         // Update display
                         this.updateOdometerDisplay(result.trip.endOdometer);
@@ -3753,8 +3957,10 @@
                         // Clear purpose field for next trip
                         document.getElementById('tripPurpose').value = '';
 
-                        // Show success message
-                        this.showMessage(result.message, 'success');
+                        // Show success message with distance information
+                        const distanceSource = endOdometerValue && !isNaN(parseFloat(endOdometerValue)) ? 'odometer reading' : 'GPS tracking';
+                        const successMessage = `Trip ended successfully! Distance: ${actualTravelledDistance.toFixed(2)}km (${distanceSource}). New odometer: ${this.roundDistance(parseFloat(result.trip.endOdometer))}km`;
+                        this.showMessage(successMessage, 'success');
                         locationStatus.classList.add('hidden');
 
                         // Refresh trip history
@@ -3768,105 +3974,6 @@
                     console.error('Error ending trip:', error);
                     document.getElementById('locationStatus').classList.add('hidden');
                     this.showMessage('Error ending trip: ' + error.message, 'error');
-                }
-            }
-            
-            // Enhanced route-based distance calculation for comprehensive tracking
-            calculateRouteDistance(routePoints) {
-                if (!routePoints || routePoints.length < 2) {
-                    return 0;
-                }
-                
-                let totalDistance = 0;
-                for (let i = 1; i < routePoints.length; i++) {
-                    const prevPoint = routePoints[i - 1];
-                    const currentPoint = routePoints[i];
-                    
-                    const segmentDistance = this.calculateDistance(
-                        prevPoint.latitude, prevPoint.longitude,
-                        currentPoint.latitude, currentPoint.longitude
-                    );
-                    
-                    totalDistance += segmentDistance;
-                }
-                
-                return totalDistance;
-            }
-            
-            // Load existing route points into map
-            loadExistingRoute(routePoints) {
-                if (!routePoints || routePoints.length === 0 || !this.tripMap) {
-                    return;
-                }
-                
-                try {
-                    // Convert route points to leaflet format
-                    const latLngs = routePoints.map(point => [point.latitude, point.longitude]);
-                    
-                    // Update route polyline with existing points
-                    if (this.routePolyline) {
-                        this.routePolyline.setLatLngs(latLngs);
-                        this.routePoints = latLngs;
-                    }
-                    
-                    // Update map view to show the route
-                    if (latLngs.length > 0) {
-                        const bounds = L.latLngBounds(latLngs);
-                        this.tripMap.fitBounds(bounds, { padding: [20, 20] });
-                    }
-                    
-                    console.log(`Loaded ${routePoints.length} existing route points`);
-                } catch (error) {
-                    console.error('Error loading existing route:', error);
-                }
-            }
-            
-            // Periodic state synchronization for persistence
-            startPeriodicStateSync() {
-                if (this.backgroundSyncInterval) {
-                    clearInterval(this.backgroundSyncInterval);
-                }
-                
-                // Sync state every 30 seconds
-                this.backgroundSyncInterval = setInterval(() => {
-                    this.syncTripState();
-                }, 30000);
-                
-                console.log('Periodic state synchronization started');
-            }
-            
-            stopPeriodicStateSync() {
-                if (this.backgroundSyncInterval) {
-                    clearInterval(this.backgroundSyncInterval);
-                    this.backgroundSyncInterval = null;
-                    console.log('Periodic state synchronization stopped');
-                }
-            }
-            
-            async syncTripState() {
-                try {
-                    if (!this.watchId) {
-                        return; // No active trip
-                    }
-                    
-                    // Update trip with current GPS distance
-                    const response = await fetch('/api/trip/sync', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${this.token}`
-                        },
-                        body: JSON.stringify({
-                            gpsDistance: this.totalGpsDistance || 0,
-                            lastLocation: this.currentLocation
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        console.log('Trip state synchronized successfully');
-                    }
-                } catch (error) {
-                    console.warn('Failed to sync trip state:', error);
                 }
             }
         }
