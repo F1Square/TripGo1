@@ -1726,8 +1726,34 @@
                         // Resume continuous GPS tracking for the active trip
                         this.startLocationWatch();
                         
-                        // If the trip has some existing GPS distance, initialize it
-                        if (tripData.activeTrip.gpsDistance) {
+                        // Check for stored trip state and restore if available
+                        const tripId = tripData.activeTrip.id || 'current';
+                        const storedTripState = localStorage.getItem(`tripgo_trip_state_${tripId}`);
+                        if (storedTripState) {
+                            try {
+                                const tripState = JSON.parse(storedTripState);
+                                const timeDifference = Date.now() - (tripState.lastUpdateTime || 0);
+                                
+                                // Only restore if the stored state is reasonably recent (within 24 hours)
+                                if (timeDifference < 24 * 60 * 60 * 1000) {
+                                    this.totalGpsDistance = tripState.totalGpsDistance || 0;
+                                    this.routePoints = tripState.routePoints || [];
+                                    if (tripState.lastKnownLocation) {
+                                        this.currentLocation = tripState.lastKnownLocation;
+                                    }
+                                    console.log('Restored trip state - GPS distance:', this.totalGpsDistance.toFixed(2), 'km');
+                                    this.updateLiveDistance();
+                                } else {
+                                    console.log('Stored trip state too old, starting fresh');
+                                    localStorage.removeItem(`tripgo_trip_state_${tripId}`);
+                                }
+                            } catch (error) {
+                                console.error('Error restoring trip state:', error);
+                            }
+                        }
+                        
+                        // Fallback: If the trip has server-stored GPS distance, use it
+                        if (!this.totalGpsDistance && tripData.activeTrip.gpsDistance) {
                             this.totalGpsDistance = tripData.activeTrip.gpsDistance;
                             this.updateLiveDistance();
                         }
@@ -2158,6 +2184,9 @@
             }
 
             displayActiveTrip(trip) {
+                // Set current trip ID for state storage
+                this.currentTripId = trip.id || 'current';
+                
                 document.getElementById('setupForm').classList.add('hidden');
                 document.getElementById('activeTripDisplay').classList.remove('hidden');
                 document.getElementById('tripStatus').textContent = 'Trip in Progress';
@@ -2169,7 +2198,22 @@
                 document.getElementById('activeStartTime').textContent = new Date(trip.startTime).toLocaleTimeString();
                 
                 // Initialize real-time tracking variables
-                this.totalGpsDistance = 0;
+                // Check if we have stored GPS distance from previous session
+                const storedTripState = localStorage.getItem(`tripgo_trip_state_${trip.id || 'current'}`);
+                if (storedTripState) {
+                    try {
+                        const tripState = JSON.parse(storedTripState);
+                        this.totalGpsDistance = tripState.totalGpsDistance || 0;
+                        this.routePoints = tripState.routePoints || [];
+                        console.log('Restored GPS distance from storage:', this.totalGpsDistance.toFixed(2), 'km');
+                    } catch (error) {
+                        console.error('Error parsing stored trip state:', error);
+                        this.totalGpsDistance = 0;
+                    }
+                } else {
+                    this.totalGpsDistance = trip.gpsDistance || 0; // Use server data if available
+                }
+                
                 this.tripStartTime = new Date(trip.startTime);
                 
                 // Initialize map with trip start location
@@ -3062,6 +3106,9 @@
                     const result = await response.json();
 
                     if (result.success) {
+                        // Set current trip ID for state storage
+                        this.currentTripId = result.trip.id || 'current';
+                        
                         this.displayActiveTrip(result.trip);
                         this.showMessage('Trip started successfully! 🚗', 'success');
                         locationStatus.classList.add('hidden');
@@ -3256,6 +3303,19 @@
                         
                         localStorage.setItem('tripgo_background_state', JSON.stringify(backgroundState));
                         console.log('Background state stored:', backgroundState);
+                        
+                        // Also store persistent trip state (survives app closure)
+                        const persistentTripState = {
+                            totalGpsDistance: this.totalGpsDistance || 0,
+                            routePoints: this.routePoints || [],
+                            lastUpdateTime: Date.now(),
+                            tripStartTime: this.tripStartTime ? this.tripStartTime.toISOString() : null
+                        };
+                        
+                        // Use 'current' as fallback trip ID
+                        const tripId = this.currentTripId || 'current';
+                        localStorage.setItem(`tripgo_trip_state_${tripId}`, JSON.stringify(persistentTripState));
+                        console.log('Persistent trip state stored for trip:', tripId);
                     }
                 } catch (error) {
                     console.error('Failed to store background state:', error);
@@ -3304,6 +3364,28 @@
                     
                 } catch (error) {
                     console.error('Failed to resume from background:', error);
+                }
+            }
+
+            // Store trip state persistently for app resume
+            storeTripState() {
+                try {
+                    // Only store if we're actively tracking
+                    if (this.watchId && this.totalGpsDistance !== undefined) {
+                        const persistentTripState = {
+                            totalGpsDistance: this.totalGpsDistance || 0,
+                            routePoints: this.routePoints || [],
+                            lastUpdateTime: Date.now(),
+                            tripStartTime: this.tripStartTime ? this.tripStartTime.toISOString() : null,
+                            lastKnownLocation: this.currentLocation
+                        };
+                        
+                        // Use 'current' as fallback trip ID
+                        const tripId = this.currentTripId || 'current';
+                        localStorage.setItem(`tripgo_trip_state_${tripId}`, JSON.stringify(persistentTripState));
+                    }
+                } catch (error) {
+                    console.error('Failed to store trip state:', error);
                 }
             }
 
@@ -3531,6 +3613,9 @@
                         // Send route point to server periodically
                         this.sendRoutePointToServer(newLocation);
                         
+                        // Store trip state persistently (every GPS update)
+                        this.storeTripState();
+                        
                         // Update last known position only if we accepted the point
                         this.lastKnownPosition = newLocation;
                     } else {
@@ -3720,6 +3805,8 @@
                 // Update display every 5 seconds for smooth real-time updates
                 this.liveUpdateInterval = setInterval(() => {
                     this.updateLiveDistance();
+                    // Periodically store trip state (every 5 seconds)
+                    this.storeTripState();
                 }, 5000);
             }
 
@@ -3956,6 +4043,17 @@
                         
                         // Clear purpose field for next trip
                         document.getElementById('tripPurpose').value = '';
+
+                        // Clean up stored trip state
+                        const tripId = this.currentTripId || 'current';
+                        localStorage.removeItem(`tripgo_trip_state_${tripId}`);
+                        localStorage.removeItem('tripgo_background_state');
+                        console.log('Cleaned up stored trip state');
+                        
+                        // Reset tracking variables
+                        this.totalGpsDistance = 0;
+                        this.routePoints = [];
+                        this.currentTripId = null;
 
                         // Show success message with distance information
                         const distanceSource = endOdometerValue && !isNaN(parseFloat(endOdometerValue)) ? 'odometer reading' : 'GPS tracking';
