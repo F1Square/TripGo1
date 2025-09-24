@@ -3,7 +3,6 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const moment = require('moment');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -43,28 +42,6 @@ app.use(session({
     } // 24 hours
 }));
 app.use(express.static('public'));
-
-// CSV file for exports
-const csvFile = path.join(__dirname, 'Motor_Vehicle_Log.csv');
-
-// CSV Writer setup - Excel compatible format
-const csvWriter = createCsvWriter({
-    path: csvFile,
-    header: [
-        { id: 'began', title: 'Date Trip Began' },
-        { id: 'ended', title: 'Date Trip Ended' },
-        { id: 'purpose', title: 'Purpose of Trip' },
-        { id: 'areaFrom', title: 'Area From' },
-        { id: 'areaTo', title: 'Area To' },
-        { id: 'start', title: 'Odometer Reading Start' },
-        { id: 'finish', title: 'Odometer Reading Finish' },
-        { id: 'kilometresTravelled', title: 'Kilometres Travelled' },
-        { id: 'signatureEntry', title: 'Signature of person making Entry' },
-        { id: 'driverName', title: 'Name of Driver or Vehicle Registration No' },
-        { id: 'fbtYear', title: 'FBT Year Ending' },
-        { id: 'dateOfEntry', title: 'Date of Entry' }
-    ]
-});
 
 // Authentication middleware
 function authenticateToken(req, res, next) {
@@ -640,50 +617,8 @@ app.post('/api/trip/end', authenticateToken, async (req, res) => {
         userData.activeTrip = null;
         await userData.save();
         
-        // Write to CSV in Excel-compatible format (using stored area information)
-        const csvData = {
-            began: completedTrip.startDate,
-            ended: completedTrip.endDate,
-            purpose: completedTrip.purpose,
-            areaFrom: completedTrip.startArea,
-            areaTo: completedTrip.endArea,
-            start: completedTrip.startOdometer,
-            finish: completedTrip.endOdometer,
-            kilometresTravelled: completedTrip.totalDistance,
-            signatureEntry: '', // Empty as requested
-            driverName: user.fullName,
-            fbtYear: new Date().getFullYear() + 1, // Next FBT year
-            dateOfEntry: new Date().toISOString().split('T')[0]
-        };
-        
-        // Append to CSV
-        try {
-            if (!fs.existsSync(csvFile)) {
-                csvWriter.writeRecords([csvData]);
-            } else {
-                const csvAppendWriter = createCsvWriter({
-                    path: csvFile,
-                    header: [
-                        { id: 'began', title: 'Date Trip Began' },
-                        { id: 'ended', title: 'Date Trip Ended' },
-                        { id: 'purpose', title: 'Purpose of Trip' },
-                        { id: 'areaFrom', title: 'Area From' },
-                        { id: 'areaTo', title: 'Area To' },
-                        { id: 'start', title: 'Odometer Reading Start' },
-                        { id: 'finish', title: 'Odometer Reading Finish' },
-                        { id: 'kilometresTravelled', title: 'Kilometres Travelled' },
-                        { id: 'signatureEntry', title: 'Signature of person making Entry' },
-                        { id: 'driverName', title: 'Name of Driver or Vehicle Registration No' },
-                        { id: 'fbtYear', title: 'FBT Year Ending' },
-                        { id: 'dateOfEntry', title: 'Date of Entry' }
-                    ],
-                    append: true
-                });
-                csvAppendWriter.writeRecords([csvData]);
-            }
-        } catch (csvError) {
-            console.error('CSV write error:', csvError);
-        }
+        // Note: Individual trip CSV writing removed - use export function instead
+        console.log('Trip completed and saved to database');
         
         res.json({ 
             success: true, 
@@ -806,6 +741,9 @@ app.post('/api/trips/export', authenticateToken, async (req, res) => {
         }
 
         const user = await User.findOne({ email: req.userId });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
         // Filter trips by date range and user
         const filteredTrips = await Trip.find({
@@ -820,74 +758,63 @@ app.post('/api/trips/export', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'No trips found in the specified date range' });
         }
 
-        // Create CSV filename with date range
-        const startDateStr = startDate.replace(/-/g, '');
-        const endDateStr = endDate.replace(/-/g, '');
-        const filename = `Motor_Vehicle_Log_${startDateStr}_to_${endDateStr}.csv`;
-        const filepath = path.join(__dirname, 'exports', filename);
+        // Create CSV header
+        const csvHeader = [
+            'Date Trip Began',
+            'Date Trip Ended', 
+            'Purpose of Trip',
+            'Area From',
+            'Area To',
+            'Odometer Reading Start',
+            'Odometer Reading Finish',
+            'Kilometres Travelled',
+            'Signature of person making Entry',
+            'Date of Entry'
+        ];
 
-        // Create exports directory if it doesn't exist
-        const exportsDir = path.join(__dirname, 'exports');
-        if (!fs.existsSync(exportsDir)) {
-            fs.mkdirSync(exportsDir, { recursive: true });
-        }
+        // Prepare CSV rows
+        const csvRows = filteredTrips.map(trip => [
+            trip.startDate || '',
+            trip.endDate || trip.startDate || '',
+            trip.purpose || '',
+            trip.startArea || 'Unknown Area',
+            trip.endArea || 'Unknown Area',
+            trip.startOdometer || '0',
+            trip.endOdometer || '0',
+            trip.totalDistance || '0',
+            '', // Empty signature as requested
+            new Date(trip.startTime).toISOString().split('T')[0]
+        ]);
 
-        // Prepare CSV data with stored area information from database
-        const csvData = filteredTrips.map(trip => ({
-            began: trip.startDate,
-            ended: trip.endDate,
-            purpose: trip.purpose,
-            areaFrom: trip.startArea || 'Unknown Area',
-            areaTo: trip.endArea || 'Unknown Area',
-            start: trip.startOdometer,
-            finish: trip.endOdometer,
-            kilometresTravelled: trip.totalDistance,
-            signatureEntry: '', // Empty as requested
-            driverName: user.fullName,
-            fbtYear: new Date().getFullYear() + 1, // Next FBT year
-            dateOfEntry: new Date(trip.startTime).toISOString().split('T')[0]
-        }));
+        // Create CSV content
+        const csvContent = [csvHeader, ...csvRows]
+            .map(row => row.map(field => {
+                // Escape quotes and wrap fields with commas or quotes in quotes
+                const stringField = String(field);
+                if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                    return `"${stringField.replace(/"/g, '""')}"`;
+                }
+                return stringField;
+            }).join(','))
+            .join('\n');
 
-        // Create CSV writer for export
-        const exportCsvWriter = createCsvWriter({
-            path: filepath,
-            header: [
-                { id: 'began', title: 'Date Trip Began' },
-                { id: 'ended', title: 'Date Trip Ended' },
-                { id: 'purpose', title: 'Purpose of Trip' },
-                { id: 'areaFrom', title: 'Area From' },
-                { id: 'areaTo', title: 'Area To' },
-                { id: 'start', title: 'Odometer Reading Start' },
-                { id: 'finish', title: 'Odometer Reading Finish' },
-                { id: 'kilometresTravelled', title: 'Kilometres Travelled' },
-                { id: 'signatureEntry', title: 'Signature of person making Entry' },
-                { id: 'dateOfEntry', title: 'Date of Entry' }
-            ]
-        });
-
-        // Write CSV file
-        await exportCsvWriter.writeRecords(csvData);
-
-        // Send file as download
-        res.download(filepath, filename, (err) => {
-            if (err) {
-                console.error('Download error:', err);
-                res.status(500).json({ error: 'Failed to download file' });
-            } else {
-                // Clean up file after download
-                setTimeout(() => {
-                    try {
-                        fs.unlinkSync(filepath);
-                    } catch (cleanupError) {
-                        console.error('Cleanup error:', cleanupError);
-                    }
-                }, 30000); // Delete after 30 seconds
-            }
-        });
+        // Set headers for CSV download
+        const filename = `Motor_Vehicle_Log_${startDate.replace(/-/g, '')}_to_${endDate.replace(/-/g, '')}.csv`;
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', Buffer.byteLength(csvContent));
+        
+        // Send CSV content
+        res.send(csvContent);
 
     } catch (error) {
         console.error('Export error:', error);
-        res.status(500).json({ error: 'Failed to export trips' });
+        res.status(500).json({ 
+            error: 'Failed to export trips', 
+            details: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
